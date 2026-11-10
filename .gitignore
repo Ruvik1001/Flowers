@@ -1,0 +1,47 @@
+# Internal planning (local only)
+backend/GENERAL.md
+frontend/GENERAL.md
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node / frontend (prep)
+node_modules/
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/coverage/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / local data
+*.log
+logs/
+data/
+uploads/
+tmp/

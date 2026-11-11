@@ -12,6 +12,10 @@
 
 Долгоживущие ветки: `master`, `backend`, `frontend`. Подробности в `COLLAB.md`.
 
+## Backend
+
+См. [`backend/README.md`](backend/README.md) и архитектуру в `backend/docs/`.
+
 ## Документация
 
 - English: `README.md`

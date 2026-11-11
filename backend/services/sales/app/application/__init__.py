@@ -85,6 +85,7 @@ class SalesService:
             self.inventory.receive_return(product_id, quantity)
         elif kind == RefundKind.DEFECT_WRITE_OFF and product_id and quantity:
             self.inventory.write_off_defect(product_id, quantity, photo_ids or [])
+        self.store.sales[sale.id] = sale  # persist updated refunded amount
         self.store.refunds[refund.id] = refund
         return refund
 

@@ -45,6 +45,7 @@ class ProcurementService:
         value = Decimal(str(quantity))
         line.accept(value)
         self.inventory.receive(product_id, value, line.unit_cost.amount)
+        self.store.supplies[supply.id] = supply  # write-through when persistence is enabled
         import os
 
         self.bus.publish(

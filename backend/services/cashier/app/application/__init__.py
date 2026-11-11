@@ -1,13 +1,13 @@
 from decimal import Decimal
 from shared.errors import AppError
-from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus
+from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus, StreamBus
 from shared.utils import Money
 from app.domain import Shift
 from app.infrastructure.store import CashierStore
 
 
 class CashierService:
-    def __init__(self, store: CashierStore, bus: InMemoryStreamBus | None = None) -> None:
+    def __init__(self, store: CashierStore, bus: StreamBus | None = None) -> None:
         self.store, self.bus = store, bus or InMemoryStreamBus()
 
     def open(self, cashier_id: str, opening_cash: Decimal) -> Shift:
@@ -20,11 +20,13 @@ class CashierService:
     def record_cash(self, shift_id: str, amount: Decimal, refund: bool = False) -> Shift:
         shift = self.store.get(shift_id)
         shift.record(amount, refund)
+        self.store.shifts[shift.id] = shift  # write-through when persistence is enabled
         return shift
 
     def close(self, shift_id: str, actual_cash: Decimal) -> Shift:
         shift = self.store.get(shift_id)
         shift.close(actual_cash)
+        self.store.shifts[shift.id] = shift  # write-through when persistence is enabled
         import os
 
         self.bus.publish(

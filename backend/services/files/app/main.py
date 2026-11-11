@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 
 from shared.fastapi_ext import (
     install_exception_handlers,
+    install_readiness,
     install_request_context_middleware,
 )
 
@@ -19,6 +20,7 @@ def create_app(
     app = FastAPI(title="Flowers Files")
     app.state.store = store or FileStore(cfg.upload_dir, cfg.max_upload_bytes)
     install_exception_handlers(app)
+    install_readiness(app, cfg.service_name, check_db=True)
     install_request_context_middleware(app, cfg.service_name)
 
     @app.get("/api/v1/health")

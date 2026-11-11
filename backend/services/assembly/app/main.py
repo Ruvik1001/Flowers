@@ -1,16 +1,24 @@
 from decimal import Decimal
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
-from shared.fastapi_ext import install_exception_handlers, install_request_context_middleware
+from shared.fastapi_ext import (
+    install_exception_handlers,
+    install_readiness,
+    install_request_context_middleware,
+)
+from shared.persistence.outbox_bus import build_outbox_bus, outbox_lifespan
 from app.application import AssemblyService, HttpxInventoryClient
 from app.config import settings
 from app.domain import AssemblyKind
 from app.infrastructure.store import store
 
-app = FastAPI(title="Flowers Assembly")
+# Request path publishes into the transactional outbox; the lifespan worker relays to Redis.
+bus = build_outbox_bus(settings.service_name, settings.redis_url or None, database_url=settings.database_url)
+app = FastAPI(title="Flowers Assembly", lifespan=outbox_lifespan(bus))
 install_exception_handlers(app)
+install_readiness(app, settings.service_name, check_db=True, check_redis=True)
 install_request_context_middleware(app, settings.service_name)
-service = AssemblyService(store, HttpxInventoryClient(settings.inventory_url))
+service = AssemblyService(store, HttpxInventoryClient(settings.inventory_url), bus)
 
 
 class ComponentIn(BaseModel):

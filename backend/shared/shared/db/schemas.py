@@ -9,4 +9,5 @@ SCHEMAS = (
     "files",
     "audit",
     "analytics",
+    "messaging",
 )

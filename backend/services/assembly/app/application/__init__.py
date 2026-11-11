@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Protocol
 import httpx
-from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus
+from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus, StreamBus
 from app.domain import Assembly, AssemblyKind, Component, allocation_cost, validate_components
 from app.infrastructure.store import AssemblyStore
 
@@ -26,7 +26,7 @@ class HttpxInventoryClient:
 
 
 class AssemblyService:
-    def __init__(self, store: AssemblyStore, inventory: InventoryClient, bus: InMemoryStreamBus | None = None) -> None:
+    def __init__(self, store: AssemblyStore, inventory: InventoryClient, bus: StreamBus | None = None) -> None:
         self.store, self.inventory, self.bus = store, inventory, bus or InMemoryStreamBus()
 
     def assemble(self, bouquet_product_id: str, quantity: Decimal, kind: AssemblyKind, components: list[dict], recipe_id: str | None = None) -> Assembly:

@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 
 from shared.db.base import ensure_schemas, make_engine, make_session_factory, session_scope
 from shared.errors import AppError
-from shared.fastapi_ext import install_exception_handlers, install_request_context_middleware
+from shared.fastapi_ext import (
+    install_exception_handlers,
+    install_readiness,
+    install_request_context_middleware,
+)
 from shared.http.client import InternalClient
 from shared.messaging.events import DomainEvent
 from shared.messaging.streams import RedisStreamBus
@@ -40,6 +44,16 @@ def test_session_scope_commit_and_rollback() -> None:
     next(gen2)
     with pytest.raises(RuntimeError):
         gen2.throw(RuntimeError("boom"))
+
+
+def test_install_readiness_ready_when_checks_skipped() -> None:
+    app = FastAPI()
+    install_readiness(app, "gateway")
+
+    client = TestClient(app)
+    response = client.get("/api/v1/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready", "service": "gateway"}
 
 
 def test_fastapi_ext_handlers_and_middleware() -> None:

@@ -1,3 +1,5 @@
+# Local/dev: OTLP ingest + debug exporter (console).
+# Prod MonitoringPLTG: set OTLP_MONITORING_ENDPOINT and use otel-collector-config.prod.yml
 receivers:
   otlp:
     protocols:

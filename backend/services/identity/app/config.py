@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     service_name: str = "identity"
     database_url: str = "sqlite+pysqlite:///:memory:"
+    redis_url: str = ""
     jwt_secret: str = "change-me"
     access_token_minutes: int = 30
     refresh_token_days: int = 14

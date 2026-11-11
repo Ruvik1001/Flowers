@@ -4,13 +4,18 @@ from decimal import Decimal
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from shared.fastapi_ext import install_exception_handlers, install_request_context_middleware
+from shared.fastapi_ext import (
+    install_exception_handlers,
+    install_readiness,
+    install_request_context_middleware,
+)
 from app.application import InventoryService
 from app.config import settings
 from app.infrastructure.store import store
 
 app = FastAPI(title="Flowers Inventory")
 install_exception_handlers(app)
+install_readiness(app, settings.service_name, check_db=True)
 install_request_context_middleware(app, settings.service_name)
 service = InventoryService(store)
 

@@ -9,6 +9,7 @@ CREATE SCHEMA IF NOT EXISTS cashier;
 CREATE SCHEMA IF NOT EXISTS files;
 CREATE SCHEMA IF NOT EXISTS audit;
 CREATE SCHEMA IF NOT EXISTS analytics;
+CREATE SCHEMA IF NOT EXISTS messaging;
 
 -- identity
 CREATE TABLE IF NOT EXISTS identity.roles (
@@ -66,6 +67,9 @@ CREATE TABLE IF NOT EXISTS inventory.lots (
     expires_on DATE NULL
 );
 
+CREATE INDEX IF NOT EXISTS ix_lots_product_id
+    ON inventory.lots (product_id);
+
 CREATE TABLE IF NOT EXISTS inventory.write_offs (
     id TEXT PRIMARY KEY,
     payload JSONB NOT NULL
@@ -87,6 +91,15 @@ CREATE TABLE IF NOT EXISTS sales.sales (
     id TEXT PRIMARY KEY,
     payload JSONB NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sales.refunds (
+    id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL,
+    payload JSONB NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_refunds_sale_id
+    ON sales.refunds (sale_id);
 
 -- cashier
 CREATE TABLE IF NOT EXISTS cashier.shifts (
@@ -122,3 +135,25 @@ CREATE TABLE IF NOT EXISTS analytics.snapshots (
     payload JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- messaging: transactional outbox shared by all services
+CREATE TABLE IF NOT EXISTS messaging.outbox (
+    id TEXT PRIMARY KEY,
+    service_name TEXT NOT NULL,
+    event_name TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    idempotency_key TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    published_at TIMESTAMPTZ NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_outbox_service_name
+    ON messaging.outbox (service_name);
+
+CREATE UNIQUE INDEX IF NOT EXISTS outbox_idempotency_uidx
+    ON messaging.outbox (idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS outbox_unpublished_idx
+    ON messaging.outbox (created_at)
+    WHERE published_at IS NULL;

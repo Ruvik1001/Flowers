@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from shared.utils import Money
 
-from app.domain import InventoryCount, Lot, WriteOff, consume_fifo, expired
+from app.domain import InventoryCount, Lot, WriteOff, expired
 from app.infrastructure.store import InventoryStore
 
 
@@ -20,7 +20,7 @@ class InventoryService:
         return lot
 
     def consume(self, product_id: str, quantity: Decimal):
-        return consume_fifo(list(self.store.lots.values()), product_id, quantity)
+        return self.store.consume_fifo_safe(product_id, quantity)
 
     def write_off(self, product_id: str, quantity: Decimal, reason: str, photo_ids: list[str]) -> WriteOff:
         allocations = self.consume(product_id, quantity)

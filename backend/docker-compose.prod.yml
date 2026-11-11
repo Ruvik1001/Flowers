@@ -1,21 +1,118 @@
+# Production overlay: image builds only (no source bind-mounts), gateway is the sole
+# public edge, resource limits, env_file .env.prod (never commit secrets).
+#
+#   cp .env.prod.example .env.prod
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod config
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Optional MonitoringPLTG collector config:
+#   OTEL_COLLECTOR_CONFIG=./otel-collector-config.prod.yml
+
+x-app-deploy: &app-deploy
+  restart: always
+  deploy:
+    resources:
+      limits:
+        cpus: "1.0"
+        memory: 512M
+      reservations:
+        cpus: "0.10"
+        memory: 128M
+
+x-env-file: &env-file
+  env_file:
+    - path: .env.prod
+      required: false
+
 services:
   postgres:
-    restart: always
+    <<: *app-deploy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
   redis:
-    restart: always
+    <<: *app-deploy
+
   otel-collector:
-    restart: always
-  gateway:
-    restart: always
+    <<: *app-deploy
+    volumes:
+      - ${OTEL_COLLECTOR_CONFIG:-./otel-collector-config.yml}:/etc/otel/config.yml:ro
     environment:
+      OTLP_MONITORING_ENDPOINT: ${OTLP_MONITORING_ENDPOINT:-}
+      OTLP_MONITORING_INSECURE: ${OTLP_MONITORING_INSECURE:-true}
+
+  migrate:
+    environment:
+      APP_ENV: prod
+      DB_MIGRATE_MODE: ${DB_MIGRATE_MODE:-auto}
+
+  gateway:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
-  identity: {restart: always}
-  catalog: {restart: always}
-  inventory: {restart: always}
-  procurement: {restart: always}
-  assembly: {restart: always}
-  sales: {restart: always}
-  cashier: {restart: always}
-  audit: {restart: always}
-  analytics: {restart: always}
-  files: {restart: always}
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8000"
+
+  identity:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  catalog:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  inventory:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  procurement:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  assembly:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  sales:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  cashier:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+  audit:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+      CONSUMER_LOOP: "1"
+  analytics:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+      CONSUMER_LOOP: "1"
+  files:
+    <<: [*app-deploy, *env-file]
+    environment:
+      APP_ENV: prod
+      OTEL_CONSOLE: ${OTEL_CONSOLE:-0}
+    volumes:
+      - uploads:/data/uploads

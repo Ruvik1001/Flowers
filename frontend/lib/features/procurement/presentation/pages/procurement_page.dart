@@ -1,6 +1,7 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -129,7 +130,7 @@ class _SuppliersTab extends StatelessWidget {
   }
 }
 
-class _SuppliesTab extends StatelessWidget {
+class _SuppliesTab extends StatefulWidget {
   const _SuppliesTab({
     required this.supplies,
     required this.suppliers,
@@ -138,12 +139,58 @@ class _SuppliesTab extends StatelessWidget {
   final List<Supply> supplies;
   final List<Supplier> suppliers;
 
+  @override
+  State<_SuppliesTab> createState() => _SuppliesTabState();
+}
+
+class _SuppliesTabState extends State<_SuppliesTab> {
+  Map<String, String> _productNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProductNames();
+  }
+
+  Future<void> _loadProductNames() async {
+    try {
+      final products = await Di.I.catalog.listProducts(includeArchived: true);
+      if (!mounted) return;
+      setState(() {
+        _productNames = {for (final p in products) p.id: p.name};
+      });
+    } catch (_) {}
+  }
+
   String _supplierName(String id) =>
-      suppliers.where((s) => s.id == id).firstOrNull?.name ?? 'Поставщик';
+      widget.suppliers.where((s) => s.id == id).firstOrNull?.name ??
+      'Поставщик';
+
+  String _productName(String id) => _productNames[id] ?? 'Товар';
+
+  String _formatDate(String? raw) {
+    if (raw == null || raw.isEmpty) return Labels.orDash(null);
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    final local = parsed.toLocal();
+    final dd = local.day.toString().padLeft(2, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    final yyyy = local.year.toString();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
+    return '$dd.$mm.$yyyy $hh:$min';
+  }
+
+  String _linesSummary(Supply supply) {
+    if (supply.lines.isEmpty) return 'Без позиций';
+    return supply.lines
+        .map((line) => '${_productName(line.productId)} × ${line.ordered}')
+        .join(', ');
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (supplies.isEmpty) {
+    if (widget.supplies.isEmpty) {
       return const AsyncBody(
         loading: false,
         isEmpty: true,
@@ -154,12 +201,14 @@ class _SuppliesTab extends StatelessWidget {
     }
     return ListView.builder(
       padding: const EdgeInsets.only(top: 8, bottom: 88),
-      itemCount: supplies.length,
+      itemCount: widget.supplies.length,
       itemBuilder: (context, index) {
-        final supply = supplies[index];
+        final supply = widget.supplies[index];
         return EntityListTile(
           title: Text(_supplierName(supply.supplierId)),
-          subtitle: Text('Линий: ${supply.lines.length}'),
+          subtitle: Text(
+            '${_formatDate(supply.createdAt)}\n${_linesSummary(supply)}',
+          ),
           trailing: IconButton(
             icon: const Icon(Icons.check_circle_outline),
             tooltip: 'Принять линию',

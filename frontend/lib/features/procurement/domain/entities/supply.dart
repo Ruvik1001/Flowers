@@ -7,17 +7,20 @@ class Supply extends Equatable {
     required this.id,
     required this.supplierId,
     required this.lines,
+    this.createdAt,
   });
 
   final String id;
   final String supplierId;
   final List<SupplyLine> lines;
+  final String? createdAt;
 
   factory Supply.fromJson(Map<String, dynamic> json) {
     final raw = json['lines'];
     return Supply(
       id: json['id']?.toString() ?? '',
       supplierId: json['supplier_id']?.toString() ?? '',
+      createdAt: json['created_at']?.toString(),
       lines: raw is List
           ? raw.map((e) => SupplyLine.fromJson(asJsonMap(e))).toList()
           : const [],
@@ -25,5 +28,5 @@ class Supply extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, supplierId, lines];
+  List<Object?> get props => [id, supplierId, lines, createdAt];
 }

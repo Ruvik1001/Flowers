@@ -107,7 +107,12 @@ class IdentityStore:
                     "catalog.write",
                     "assembly.write",
                     "inventory.read",
+                    "inventory.write",
                     "inventory.write_off",
+                    "procurement.read",
+                    "procurement.write",
+                    "files.read",
+                    "files.write",
                 ],
             ),
             Role(

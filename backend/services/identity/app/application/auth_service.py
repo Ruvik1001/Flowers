@@ -68,23 +68,26 @@ class AuthService:
     ) -> User:
         if not actor.is_admin and "identity.users.write" not in actor.permissions:
             raise AppError("forbidden", "Admin or identity.users.write required", status_code=403)
-        user = store.create_user(
-            email=email,
-            password=password,
-            role_ids=role_ids,
-            object_scopes=object_scopes,
-        )
-        if self._bus:
-            import os
+        from shared.persistence.runtime import unit_of_work
 
-            self._bus.publish(
-                os.getenv("EVENT_STREAM", "domain-events"),
-                DomainEvent(
-                    name=EventNames.USER_ROLE_CHANGED,
-                    payload={"user_id": user.id, "role_ids": role_ids},
-                    idempotency_key=f"user-created:{user.id}",
-                ),
+        with unit_of_work():
+            user = store.create_user(
+                email=email,
+                password=password,
+                role_ids=role_ids,
+                object_scopes=object_scopes,
             )
+            if self._bus:
+                import os
+
+                self._bus.publish(
+                    os.getenv("EVENT_STREAM", "domain-events"),
+                    DomainEvent(
+                        name=EventNames.USER_ROLE_CHANGED,
+                        payload={"user_id": user.id, "role_ids": role_ids},
+                        idempotency_key=f"user-created:{user.id}",
+                    ),
+                )
         return user
 
     def me(self, user_id: str) -> dict:

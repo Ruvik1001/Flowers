@@ -9,15 +9,22 @@ from shared.fastapi_ext import (
     install_readiness,
     install_request_context_middleware,
 )
+from shared.persistence.outbox_bus import build_outbox_bus, outbox_lifespan
+
 from app.application import InventoryService
 from app.config import settings
 from app.infrastructure.store import store
 
-app = FastAPI(title="Flowers Inventory")
+bus = build_outbox_bus(
+    settings.service_name,
+    getattr(settings, "redis_url", None) or None,
+    database_url=getattr(settings, "database_url", None),
+)
+app = FastAPI(title="Flowers Inventory", lifespan=outbox_lifespan(bus))
 install_exception_handlers(app)
-install_readiness(app, settings.service_name, check_db=True)
+install_readiness(app, settings.service_name, check_db=True, check_redis=True)
 install_request_context_middleware(app, settings.service_name)
-service = InventoryService(store)
+service = InventoryService(store, bus)
 
 
 class ReceiveIn(BaseModel):
@@ -83,11 +90,13 @@ def consume(body: ConsumeIn):
 
 
 @app.get("/api/v1/inventory/expired")
-def get_expired(on: date | None = None): return service.expired(on)
+def get_expired(on: date | None = None):
+    return service.expired(on)
 
 
 @app.post("/api/v1/write-offs", status_code=201)
-def write_off(body: WriteOffIn): return service.write_off(**body.model_dump())
+def write_off(body: WriteOffIn):
+    return service.write_off(**body.model_dump())
 
 
 @app.post("/api/v1/inventory-counts", status_code=201)

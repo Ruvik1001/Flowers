@@ -137,6 +137,7 @@ def main() -> None:
             json={
                 "lines": [{"product_id": product_id, "quantity": "1", "unit_price": "120.00"}],
                 "payments": [{"method": "cash", "amount": "120.00"}],
+                "shift_id": shift_id,
             },
         ),
     )

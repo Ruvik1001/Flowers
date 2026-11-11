@@ -68,6 +68,13 @@ class OutboxStreamBus(StreamBus):
         # The stream is fixed by the worker (EVENT_STREAM); the outbox is stream-agnostic.
         if not self.enabled:
             return self.inner.publish(stream, event)
+        from shared.persistence.runtime import get_current_session
+
+        # Prefer the active unit_of_work session so domain write + outbox share one TX.
+        current = get_current_session()
+        if current is not None:
+            OutboxPublisher(current, self.service_name, model=self._model).enqueue(event)
+            return event.event_id
         with self._factory()() as session:
             try:
                 OutboxPublisher(session, self.service_name, model=self._model).enqueue(event)

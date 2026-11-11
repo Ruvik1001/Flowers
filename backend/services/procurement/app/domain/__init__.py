@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from shared.errors import AppError
 from shared.utils import Money, new_id
@@ -31,6 +32,7 @@ class Supply:
     supplier_id: str
     lines: list[SupplyLine]
     id: str = field(default_factory=new_id)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def complete(self) -> bool:

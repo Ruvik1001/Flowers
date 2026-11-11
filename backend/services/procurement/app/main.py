@@ -55,6 +55,7 @@ def _supply_dict(supply):
     return {
         "id": supply.id,
         "supplier_id": supply.supplier_id,
+        "created_at": supply.created_at.isoformat(),
         "lines": [
             {
                 "product_id": line.product_id,

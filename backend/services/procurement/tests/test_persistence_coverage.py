@@ -1,4 +1,5 @@
 import importlib
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -22,18 +23,21 @@ def test_persisted_store_round_trip(monkeypatch):
     store.suppliers["s1"] = Supplier("Roses Ltd", "+7001", id="s1")
     line = SupplyLine("rose", Decimal("10"), Money("2.5"))
     line.accept(Decimal("4"))
-    store.supplies["u1"] = Supply("s1", [line], id="u1")
+    created_at = datetime(2026, 3, 20, 10, 15, tzinfo=UTC)
+    store.supplies["u1"] = Supply("s1", [line], id="u1", created_at=created_at)
     store.supplies["u2"] = Supply("s2", [SupplyLine("wrap", Decimal("1"), Money("1"))], id="u2")
-    store.supplies["u1"] = Supply("s1", [line], id="u1")
+    store.supplies["u1"] = Supply("s1", [line], id="u1", created_at=created_at)
     assert set(db.table(SupplierRow)) == {"s1", "s2"}
     assert db.table(SupplierRow)["s1"].payload == {"phone": "+7001", "archived": False}
     assert db.table(SupplyRow)["u1"].supplier_id == "s1"
+    assert db.table(SupplyRow)["u1"].payload["created_at"] == created_at.isoformat()
 
     reloaded = store_module.ProcurementStore()
     assert reloaded.suppliers["s1"].phone == "+7001"
     assert reloaded.suppliers["s2"].archived is True
     restored = reloaded.supply("u1")
     assert restored.supplier_id == "s1"
+    assert restored.created_at == created_at
     assert restored.lines[0].accepted == Decimal("4")
     assert restored.lines[0].unit_cost.amount == Decimal("2.5")
     assert reloaded.supplies["u2"].lines[0].product_id == "wrap"
@@ -56,6 +60,7 @@ def test_row_converters_tolerate_missing_payload():
     assert supplier.phone is None and supplier.archived is False
     supply = store_module._supply_from_row(SupplyRow(id="u", supplier_id="s", payload=None))
     assert supply.lines == []
+    assert supply.created_at.tzinfo is not None
 
 
 def test_unknown_supply_raises():

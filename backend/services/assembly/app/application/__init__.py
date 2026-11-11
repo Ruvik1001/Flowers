@@ -45,6 +45,15 @@ class AssemblyService:
         result = Assembly(bouquet_product_id, count, kind, items, recipe_id, cost, allocations)
         self.inventory.receive(bouquet_product_id, count, unit_cost)
         self.store.assemblies[result.id] = result
-        self.bus.publish("events.assembly", DomainEvent(EventNames.ASSEMBLY_COMPLETED, {"assembly_id": result.id, "cost": str(cost.amount)}, idempotency_key=f"assembly:{result.id}"))
+        import os
+
+        self.bus.publish(
+            os.getenv("EVENT_STREAM", "domain-events"),
+            DomainEvent(
+                EventNames.ASSEMBLY_COMPLETED,
+                {"assembly_id": result.id, "cost": str(cost.amount)},
+                idempotency_key=f"assembly:{result.id}",
+            ),
+        )
         return result
 

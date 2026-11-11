@@ -9,7 +9,7 @@ from app.infrastructure.store import CashierStore, store
 
 def test_shift_reconciliation_and_event():
     bus, events = InMemoryStreamBus(), []
-    bus.subscribe("events.cashier", "test", events.append)
+    bus.subscribe("domain-events", "test", events.append)
     service = CashierService(CashierStore(), bus)
     shift = service.open("cashier", Decimal("100"))
     service.record_cash(shift.id, Decimal("50"))
@@ -17,7 +17,7 @@ def test_shift_reconciliation_and_event():
     service.close(shift.id, Decimal("145"))
     assert shift.expected_cash.amount == Decimal("140.00")
     assert shift.discrepancy.amount == Decimal("5.00")
-    assert bus.drain("events.cashier", "test") == 1
+    assert bus.drain("domain-events", "test") == 1
     with pytest.raises(AppError, match="closed"):
         service.record_cash(shift.id, Decimal("1"))
     with pytest.raises(AppError, match="already closed"):

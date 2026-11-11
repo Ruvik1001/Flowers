@@ -38,19 +38,43 @@ class CountIn(BaseModel):
 
 
 @app.get("/health")
-def health(): return {"status": "ok"}
+@app.get("/api/v1/health")
+def health():
+    return {"status": "ok", "service": settings.service_name}
+
+
+def _lot_dict(lot):
+    return {
+        "id": lot.id,
+        "product_id": lot.product_id,
+        "quantity": str(lot.quantity),
+        "unit_cost": str(lot.unit_cost.amount),
+        "received_at": lot.received_at.isoformat(),
+        "expires_on": lot.expires_on.isoformat() if lot.expires_on else None,
+    }
 
 
 @app.get("/api/v1/lots")
-def lots(): return list(store.lots.values())
+def lots():
+    return [_lot_dict(x) for x in store.lots.values()]
 
 
 @app.post("/api/v1/lots", status_code=201)
-def receive(body: ReceiveIn): return service.receive(**body.model_dump())
+def receive(body: ReceiveIn):
+    return _lot_dict(service.receive(**body.model_dump()))
 
 
 @app.post("/api/v1/inventory/consume")
-def consume(body: ConsumeIn): return service.consume(**body.model_dump())
+def consume(body: ConsumeIn):
+    allocations = service.consume(**body.model_dump())
+    return [
+        {
+            "lot_id": item.lot_id,
+            "quantity": str(item.quantity),
+            "unit_cost": str(item.unit_cost),
+        }
+        for item in allocations
+    ]
 
 
 @app.get("/api/v1/inventory/expired")

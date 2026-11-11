@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Protocol
 
 import httpx
-from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus
+from shared.messaging import DomainEvent, EventNames, StreamBus
 from shared.utils import Money
 
 from app.domain import Payment, PaymentMethod, RefundKind, Sale, SaleLine, apply_refund
@@ -36,7 +36,9 @@ class HttpxInventoryClient:
 
 
 class SalesService:
-    def __init__(self, store: SalesStore, inventory: InventoryClient, bus: InMemoryStreamBus | None = None) -> None:
+    def __init__(self, store: SalesStore, inventory: InventoryClient, bus: StreamBus | None = None) -> None:
+        from shared.messaging import InMemoryStreamBus
+
         self.store, self.inventory, self.bus = store, inventory, bus or InMemoryStreamBus()
 
     def complete(self, lines: list[dict], payments: list[dict]) -> Sale:
@@ -48,7 +50,32 @@ class SalesService:
             allocations = self.inventory.consume(line.product_id, line.quantity)
             sale.allocations.extend({"product_id": line.product_id, **item} for item in allocations)
         self.store.sales[sale.id] = sale
-        self.bus.publish("events.sales", DomainEvent(EventNames.SALE_COMPLETED, {"sale_id": sale.id, "total": str(sale.total.amount)}, idempotency_key=f"sale:{sale.id}"))
+        import os
+        from datetime import UTC, datetime
+
+        stream = os.getenv("EVENT_STREAM", "domain-events")
+        self.bus.publish(
+            stream,
+            DomainEvent(
+                EventNames.SALE_COMPLETED,
+                {
+                    "sale_id": sale.id,
+                    "total": str(sale.total.amount),
+                    "revenue": str(sale.total.amount),
+                    "cost": "0",
+                    "day": datetime.now(UTC).date().isoformat(),
+                    "items": [
+                        {
+                            "product_id": line.product_id,
+                            "quantity": str(line.quantity),
+                            "total": str((line.unit_price * line.quantity).amount),
+                        }
+                        for line in sale.lines
+                    ],
+                },
+                idempotency_key=f"sale:{sale.id}",
+            ),
+        )
         return sale
 
     def refund(self, sale_id: str, amount: Decimal, kind: RefundKind, product_id: str | None = None, quantity: Decimal | None = None, photo_ids: list[str] | None = None):

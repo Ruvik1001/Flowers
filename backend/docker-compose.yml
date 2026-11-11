@@ -1,31 +1,37 @@
 x-service: &service
   restart: unless-stopped
-  environment:
+  environment: &service-env
     DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://flowers:flowers@postgres:5432/flowers}
     REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-    JWT_SECRET: ${JWT_SECRET:-change-me}
+    JWT_SECRET: ${JWT_SECRET:-change-me-please-use-long-secret}
     EVENT_STREAM: ${EVENT_STREAM:-domain-events}
-    OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://otel-collector:4317}
+    OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://otel-collector:4318/v1/traces}
+    DB_INIT_SQL: /app/db/init.sql
+    BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@flowers.local}
+    BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-admin12345}
   depends_on:
     postgres:
       condition: service_healthy
     redis:
       condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-flowers}
       POSTGRES_USER: ${POSTGRES_USER:-flowers}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowers}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flowers}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flowers} -d ${POSTGRES_DB:-flowers}"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -35,26 +41,41 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.113.0
+    image: otel/opentelemetry-collector-contrib:0.120.0
     command: ["--config=/etc/otel/config.yml"]
     volumes:
       - ./otel-collector-config.yml:/etc/otel/config.yml:ro
-    ports:
-      - "4317:4317"
-      - "4318:4318"
+
+  migrate:
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://flowers:flowers@postgres:5432/flowers}
+      DB_INIT_SQL: /app/db/init.sql
+    volumes:
+      - ./db:/app/db:ro
+      - ./scripts:/app/scripts:ro
+    command:
+      - bash
+      - -lc
+      - pip install --no-cache-dir 'psycopg[binary]>=3.1' && python /app/scripts/migrate_standalone.py
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   gateway:
     <<: *service
     build:
       context: .
-      dockerfile: services/gateway/Dockerfile
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: gateway}
     ports:
       - "8080:8000"
     environment:
-      JWT_SECRET: ${JWT_SECRET:-change-me}
+      <<: *service-env
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-0}
       IDENTITY_URL: http://identity:8000
       CATALOG_URL: http://catalog:8000
@@ -69,35 +90,77 @@ services:
 
   identity:
     <<: *service
-    build: {context: ., dockerfile: services/identity/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: identity}
   catalog:
     <<: *service
-    build: {context: ., dockerfile: services/catalog/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: catalog}
   inventory:
     <<: *service
-    build: {context: ., dockerfile: services/inventory/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: inventory}
   procurement:
     <<: *service
-    build: {context: ., dockerfile: services/procurement/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: procurement}
+    environment:
+      <<: *service-env
+      INVENTORY_URL: http://inventory:8000
   assembly:
     <<: *service
-    build: {context: ., dockerfile: services/assembly/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: assembly}
+    environment:
+      <<: *service-env
+      INVENTORY_URL: http://inventory:8000
+      CATALOG_URL: http://catalog:8000
   sales:
     <<: *service
-    build: {context: ., dockerfile: services/sales/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: sales}
+    environment:
+      <<: *service-env
+      INVENTORY_URL: http://inventory:8000
+      CASHIER_URL: http://cashier:8000
   cashier:
     <<: *service
-    build: {context: ., dockerfile: services/cashier/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: cashier}
   audit:
     <<: *service
-    build: {context: ., dockerfile: services/audit/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: audit}
   analytics:
     <<: *service
-    build: {context: ., dockerfile: services/analytics/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: analytics}
   files:
     <<: *service
-    build: {context: ., dockerfile: services/files/Dockerfile}
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.service
+      args: {SERVICE_NAME: files}
     environment:
+      <<: *service-env
       UPLOAD_DIR: /data/uploads
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
     volumes:

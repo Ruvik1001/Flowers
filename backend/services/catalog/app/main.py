@@ -30,19 +30,38 @@ class RecipeIn(BaseModel):
 
 
 @app.get("/health")
-def health(): return {"status": "ok"}
+@app.get("/api/v1/health")
+def health():
+    return {"status": "ok", "service": settings.service_name}
+
+
+def _product_dict(product):
+    return {
+        "id": product.id,
+        "name": product.name,
+        "kind": product.kind.value if hasattr(product.kind, "value") else str(product.kind),
+        "sell_price": str(product.sell_price.amount),
+        "archived": product.archived,
+    }
 
 
 @app.get("/api/v1/products")
-def products(include_archived: bool = False): return [x for x in store.products.values() if include_archived or not x.archived]
+def products(include_archived: bool = False):
+    return [
+        _product_dict(x)
+        for x in store.products.values()
+        if include_archived or not x.archived
+    ]
 
 
 @app.post("/api/v1/products", status_code=201)
-def create_product(body: ProductIn): return service.create_product(**body.model_dump())
+def create_product(body: ProductIn):
+    return _product_dict(service.create_product(**body.model_dump()))
 
 
 @app.post("/api/v1/products/{product_id}/archive")
-def archive_product(product_id: str): return service.archive_product(product_id)
+def archive_product(product_id: str):
+    return _product_dict(service.archive_product(product_id))
 
 
 @app.get("/api/v1/recipes")

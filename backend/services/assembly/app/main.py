@@ -27,7 +27,9 @@ class AssemblyIn(BaseModel):
 
 
 @app.get("/health")
-def health(): return {"status": "ok"}
+@app.get("/api/v1/health")
+def health():
+    return {"status": "ok", "service": settings.service_name}
 
 
 @app.get("/api/v1/assemblies")

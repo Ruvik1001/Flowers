@@ -89,15 +89,19 @@ def create_app(
         headers = {"X-Request-Id": request_id}
         if authorization := request.headers.get("Authorization"):
             headers["Authorization"] = authorization
+        content_type = request.headers.get("content-type")
+        if content_type:
+            headers["Content-Type"] = content_type
         if claims:
             headers["X-User-Id"] = str(claims.get("sub", ""))
             headers["X-User-Email"] = str(claims.get("email", ""))
+        body = await request.body()
         try:
             upstream = await app.state.client.request(
                 request.method,
                 f"{target}/api/v1/{path}",
                 params=request.query_params,
-                content=await request.body(),
+                content=body if body else None,
                 headers=headers,
             )
         except httpx.RequestError as exc:

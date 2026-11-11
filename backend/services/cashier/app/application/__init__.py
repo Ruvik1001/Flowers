@@ -25,6 +25,22 @@ class CashierService:
     def close(self, shift_id: str, actual_cash: Decimal) -> Shift:
         shift = self.store.get(shift_id)
         shift.close(actual_cash)
-        self.bus.publish("events.cashier", DomainEvent(EventNames.SHIFT_CLOSED, {"shift_id": shift.id, "expected": str(shift.expected_cash.amount), "actual": str(shift.actual_cash.amount), "discrepancy": str(shift.discrepancy.amount)}, idempotency_key=f"shift:{shift.id}:closed"))
+        import os
+
+        self.bus.publish(
+            os.getenv("EVENT_STREAM", "domain-events"),
+            DomainEvent(
+                EventNames.SHIFT_CLOSED,
+                {
+                    "shift_id": shift.id,
+                    "expected": str(shift.expected_cash.amount),
+                    "actual": str(shift.actual_cash.amount),
+                    "cash_expected": str(shift.expected_cash.amount),
+                    "cash_actual": str(shift.actual_cash.amount),
+                    "discrepancy": str(shift.discrepancy.amount),
+                },
+                idempotency_key=f"shift:{shift.id}:closed",
+            ),
+        )
         return shift
 

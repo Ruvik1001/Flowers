@@ -75,8 +75,10 @@ class AuthService:
             object_scopes=object_scopes,
         )
         if self._bus:
+            import os
+
             self._bus.publish(
-                "events.identity",
+                os.getenv("EVENT_STREAM", "domain-events"),
                 DomainEvent(
                     name=EventNames.USER_ROLE_CHANGED,
                     payload={"user_id": user.id, "role_ids": role_ids},

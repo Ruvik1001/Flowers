@@ -20,7 +20,7 @@ class Inventory:
 
 def test_sale_payments_fifo_delegation_event_and_refunds():
     inventory, bus, events = Inventory(), InMemoryStreamBus(), []
-    bus.subscribe("events.sales", "test", events.append)
+    bus.subscribe("domain-events", "test", events.append)
     service = SalesService(SalesStore(), inventory, bus)
     sale = service.complete(
         [{"product_id": "rose", "quantity": "2", "unit_price": "50"}],
@@ -28,7 +28,7 @@ def test_sale_payments_fifo_delegation_event_and_refunds():
     )
     assert sale.total.amount == Decimal("100.00")
     assert inventory.calls[0][0] == "consume"
-    assert bus.drain("events.sales", "test") == 1 and events[0].payload["sale_id"] == sale.id
+    assert bus.drain("domain-events", "test") == 1 and events[0].payload["sale_id"] == sale.id
     service.refund(sale.id, Decimal("20"), RefundKind.STOCK_BACK, "rose", Decimal("1"))
     service.refund(sale.id, Decimal("10"), RefundKind.MONEY_ONLY)
     service.refund(sale.id, Decimal("10"), RefundKind.DEFECT_WRITE_OFF, "rose", Decimal("1"), ["p"])

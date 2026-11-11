@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Protocol
 import httpx
-from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus
+from shared.messaging import DomainEvent, EventNames, StreamBus
 from shared.utils import Money
 from app.domain import Supplier, Supply, SupplyLine
 from app.infrastructure.store import ProcurementStore
@@ -21,7 +21,9 @@ class HttpxInventoryReceiver:
 
 
 class ProcurementService:
-    def __init__(self, store: ProcurementStore, inventory: InventoryReceiver, bus: InMemoryStreamBus | None = None) -> None:
+    def __init__(self, store: ProcurementStore, inventory: InventoryReceiver, bus: StreamBus | None = None) -> None:
+        from shared.messaging import InMemoryStreamBus
+
         self.store, self.inventory, self.bus = store, inventory, bus or InMemoryStreamBus()
 
     def create_supplier(self, name: str, phone: str | None = None) -> Supplier:
@@ -43,6 +45,15 @@ class ProcurementService:
         value = Decimal(str(quantity))
         line.accept(value)
         self.inventory.receive(product_id, value, line.unit_cost.amount)
-        self.bus.publish("events.procurement", DomainEvent(EventNames.SUPPLY_ACCEPTED, {"supply_id": supply.id, "product_id": product_id, "quantity": str(value)}, idempotency_key=f"supply:{supply.id}:{product_id}:{line.accepted}"))
+        import os
+
+        self.bus.publish(
+            os.getenv("EVENT_STREAM", "domain-events"),
+            DomainEvent(
+                EventNames.SUPPLY_ACCEPTED,
+                {"supply_id": supply.id, "product_id": product_id, "quantity": str(value)},
+                idempotency_key=f"supply:{supply.id}:{product_id}:{line.accepted}",
+            ),
+        )
         return supply
 

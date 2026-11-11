@@ -4,7 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
+import 'package:flowers/core/widgets/status_chip.dart';
 import 'package:flowers/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:flowers/features/auth/presentation/cubit/auth_state.dart';
 import 'package:flowers/features/cashier/domain/entities/shift.dart';
@@ -28,8 +31,13 @@ class _CashierView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Касса')),
+    return AppPageScaffold(
+      title: const Text('Касса'),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-cashier',
+        onPressed: () => _showOpenDialog(context),
+        child: const Icon(Icons.add),
+      ),
       body: BlocBuilder<CashierCubit, CashierState>(
         builder: (context, state) {
           return AsyncBody(
@@ -37,27 +45,37 @@ class _CashierView extends StatelessWidget {
             error: state.error,
             isEmpty: state.shifts.isEmpty,
             emptyMessage: 'Нет смен',
+            emptyIcon: Icons.point_of_sale_outlined,
             onRetry: () => context.read<CashierCubit>().load(),
-            child: ListView.separated(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 88),
               itemCount: state.shifts.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final shift = state.shifts[index];
-                final status = shift.isOpen ? 'Открыта' : 'Закрыта';
                 final discrepancy = shift.discrepancy != null
                     ? ' · Δ ${formatRub(shift.discrepancy!)}'
                     : '';
-                return ListTile(
-                  title: Text(status),
+                return EntityListTile(
+                  title: Text(
+                    shift.isOpen ? 'Смена открыта' : 'Смена закрыта',
+                  ),
                   subtitle: Text(
                     'Открытие: ${formatRub(shift.openingCash)}'
                     '${shift.expectedCash != null ? ' · Ожидается: ${formatRub(shift.expectedCash!)}' : ''}'
                     '$discrepancy\n'
                     '${Labels.orDash(shift.openedAt)}',
                   ),
-                  isThreeLine: true,
-                  trailing: shift.isOpen
-                      ? PopupMenuButton<String>(
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      StatusChip(
+                        label: shift.isOpen ? 'Открыта' : 'Закрыта',
+                        tone: shift.isOpen
+                            ? StatusTone.success
+                            : StatusTone.neutral,
+                      ),
+                      if (shift.isOpen)
+                        PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'cash') {
                               _showCashDialog(context, shift);
@@ -75,17 +93,14 @@ class _CashierView extends StatelessWidget {
                               child: Text('Закрыть смену'),
                             ),
                           ],
-                        )
-                      : null,
+                        ),
+                    ],
+                  ),
                 );
               },
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showOpenDialog(context),
-        child: const Icon(Icons.add),
       ),
     );
   }

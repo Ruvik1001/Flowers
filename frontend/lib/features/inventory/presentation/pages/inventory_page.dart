@@ -4,9 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
 import 'package:flowers/core/widgets/photo_upload_field.dart';
+import 'package:flowers/core/widgets/soft_card.dart';
+import 'package:flowers/core/widgets/status_chip.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/inventory/domain/entities/lot.dart';
 import 'package:flowers/features/inventory/presentation/cubit/inventory_cubit.dart';
@@ -59,18 +63,21 @@ class _InventoryViewState extends State<_InventoryView> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Склад'),
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'Партии'),
-              Tab(text: 'Просрочка'),
-              Tab(text: 'Списание'),
-              Tab(text: 'Инвентаризация'),
-            ],
-          ),
+      child: AppPageScaffold(
+        title: const Text('Склад'),
+        bottom: const TabBar(
+          isScrollable: true,
+          tabs: [
+            Tab(text: 'Партии'),
+            Tab(text: 'Просрочка'),
+            Tab(text: 'Списание'),
+            Tab(text: 'Инвентаризация'),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          heroTag: 'fab-inventory',
+          onPressed: () => _showCreateLotDialog(context),
+          child: const Icon(Icons.add),
         ),
         body: BlocConsumer<InventoryCubit, InventoryState>(
           listenWhen: (p, c) =>
@@ -96,10 +103,6 @@ class _InventoryViewState extends State<_InventoryView> {
             );
           },
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showCreateLotDialog(context),
-          child: const Icon(Icons.add),
-        ),
       ),
     );
   }
@@ -114,20 +117,25 @@ class _LotsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (lots.isEmpty) {
-      return const Center(child: Text('Нет партий'));
+      return const AsyncBody(
+        loading: false,
+        isEmpty: true,
+        emptyMessage: 'Нет партий',
+        emptyIcon: Icons.inventory_2_outlined,
+        child: SizedBox.shrink(),
+      );
     }
-    return ListView.separated(
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 88),
       itemCount: lots.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final lot = lots[index];
-        return ListTile(
+        return EntityListTile(
           title: Text(productName(lot.productId)),
           subtitle: Text(
             'Кол-во: ${lot.quantity} · ${formatRub(lot.unitCost)}\n'
             'Срок: ${Labels.orDash(lot.expiresOn)}',
           ),
-          isThreeLine: true,
         );
       },
     );
@@ -143,17 +151,27 @@ class _ExpiredTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (lots.isEmpty) {
-      return const Center(child: Text('Нет просроченных партий'));
+      return const AsyncBody(
+        loading: false,
+        isEmpty: true,
+        emptyMessage: 'Нет просроченных партий',
+        emptyIcon: Icons.event_busy_outlined,
+        child: SizedBox.shrink(),
+      );
     }
-    return ListView.separated(
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 88),
       itemCount: lots.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final lot = lots[index];
-        return ListTile(
+        return EntityListTile(
           title: Text(productName(lot.productId)),
           subtitle: Text(
             'Кол-во: ${lot.quantity} · до ${Labels.orDash(lot.expiresOn)}',
+          ),
+          trailing: const StatusChip(
+            label: 'Просрочено',
+            tone: StatusTone.warning,
           ),
         );
       },
@@ -209,57 +227,69 @@ class _WriteOffFormState extends State<_WriteOffForm> {
       return const Center(child: CircularProgressIndicator());
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
       children: [
-        ProductDropdown(
-          products: _products,
-          value: _productId,
-          onChanged: (v) => setState(() => _productId = v),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _qtyCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Количество'),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _reasonCtrl,
-          decoration: const InputDecoration(labelText: 'Причина'),
-        ),
-        const SizedBox(height: 8),
-        PhotoUploadField(
-          fileIds: _photoIds,
-          onChanged: (ids) => setState(() => _photoIds = ids),
-          minCount: 1,
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: () async {
-            if (_productId == null || _productId!.isEmpty) {
-              AppMessage.showError(context, 'Выберите товар');
-              return;
-            }
-            if (_photoIds.isEmpty) {
-              AppMessage.showError(context, 'Нужно приложить хотя бы 1 фото');
-              return;
-            }
-            try {
-              await context.read<InventoryCubit>().writeOff(
-                    productId: _productId!,
-                    quantity:
-                        double.tryParse(_qtyCtrl.text.replaceAll(',', '.')) ??
-                            0,
-                    reason: _reasonCtrl.text.trim(),
-                    photoIds: _photoIds,
-                  );
-            } catch (_) {
-              if (context.mounted) {
-                AppMessage.showError(context, 'Ошибка списания');
-              }
-            }
-          },
-          child: const Text('Списать'),
+        SoftCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ProductDropdown(
+                products: _products,
+                value: _productId,
+                onChanged: (v) => setState(() => _productId = v),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _qtyCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Количество'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _reasonCtrl,
+                decoration: const InputDecoration(labelText: 'Причина'),
+              ),
+              const SizedBox(height: 12),
+              PhotoUploadField(
+                fileIds: _photoIds,
+                onChanged: (ids) => setState(() => _photoIds = ids),
+                minCount: 1,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () async {
+                  if (_productId == null || _productId!.isEmpty) {
+                    AppMessage.showError(context, 'Выберите товар');
+                    return;
+                  }
+                  if (_photoIds.isEmpty) {
+                    AppMessage.showError(
+                      context,
+                      'Нужно приложить хотя бы 1 фото',
+                    );
+                    return;
+                  }
+                  try {
+                    await context.read<InventoryCubit>().writeOff(
+                          productId: _productId!,
+                          quantity: double.tryParse(
+                                _qtyCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              0,
+                          reason: _reasonCtrl.text.trim(),
+                          photoIds: _photoIds,
+                        );
+                  } catch (_) {
+                    if (context.mounted) {
+                      AppMessage.showError(context, 'Ошибка списания');
+                    }
+                  }
+                },
+                child: const Text('Списать'),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -311,41 +341,49 @@ class _CountFormState extends State<_CountForm> {
       return const Center(child: CircularProgressIndicator());
     }
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
       children: [
-        ProductDropdown(
-          products: _products,
-          value: _productId,
-          onChanged: (v) => setState(() => _productId = v),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _actualCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Факт'),
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: () async {
-            if (_productId == null || _productId!.isEmpty) {
-              AppMessage.showError(context, 'Выберите товар');
-              return;
-            }
-            try {
-              await context.read<InventoryCubit>().inventoryCount(
-                    productId: _productId!,
-                    actual: double.tryParse(
-                          _actualCtrl.text.replaceAll(',', '.'),
-                        ) ??
-                        0,
-                  );
-            } catch (_) {
-              if (context.mounted) {
-                AppMessage.showError(context, 'Ошибка инвентаризации');
-              }
-            }
-          },
-          child: const Text('Провести'),
+        SoftCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ProductDropdown(
+                products: _products,
+                value: _productId,
+                onChanged: (v) => setState(() => _productId = v),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _actualCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Факт'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () async {
+                  if (_productId == null || _productId!.isEmpty) {
+                    AppMessage.showError(context, 'Выберите товар');
+                    return;
+                  }
+                  try {
+                    await context.read<InventoryCubit>().inventoryCount(
+                          productId: _productId!,
+                          actual: double.tryParse(
+                                _actualCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              0,
+                        );
+                  } catch (_) {
+                    if (context.mounted) {
+                      AppMessage.showError(context, 'Ошибка инвентаризации');
+                    }
+                  }
+                },
+                child: const Text('Провести'),
+              ),
+            ],
+          ),
         ),
       ],
     );

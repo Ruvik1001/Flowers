@@ -29,3 +29,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces.ttf
+    - family: Source Sans 3
+      fonts:
+        - asset: assets/fonts/SourceSans3.ttf

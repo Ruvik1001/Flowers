@@ -4,8 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
+import 'package:flowers/core/widgets/status_chip.dart';
 import 'package:flowers/features/assembly/domain/entities/assembly.dart';
 import 'package:flowers/features/assembly/presentation/cubit/assembly_cubit.dart';
 import 'package:flowers/features/assembly/presentation/cubit/assembly_state.dart';
@@ -54,8 +57,13 @@ class _AssemblyViewState extends State<_AssemblyView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Сборка')),
+    return AppPageScaffold(
+      title: const Text('Сборка'),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-assembly',
+        onPressed: () => _showCreateDialog(context),
+        child: const Icon(Icons.add),
+      ),
       body: BlocBuilder<AssemblyCubit, AssemblyState>(
         builder: (context, state) {
           return AsyncBody(
@@ -63,27 +71,27 @@ class _AssemblyViewState extends State<_AssemblyView> {
             error: state.error,
             isEmpty: state.assemblies.isEmpty,
             emptyMessage: 'Нет сборок',
+            emptyIcon: Icons.local_florist_outlined,
             onRetry: () => context.read<AssemblyCubit>().load(),
-            child: ListView.separated(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 88),
               itemCount: state.assemblies.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final item = state.assemblies[index];
-                return ListTile(
+                return EntityListTile(
                   title: Text(_bouquetName(item.bouquetProductId)),
                   subtitle: Text(
-                    '${Labels.assemblyKind(item.kind)} × ${item.quantity} · '
-                    '${formatRub(item.cost)}',
+                    '× ${item.quantity} · ${formatRub(item.cost)}',
+                  ),
+                  trailing: StatusChip(
+                    label: Labels.assemblyKind(item.kind),
+                    tone: StatusTone.accent,
                   ),
                 );
               },
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(context),
-        child: const Icon(Icons.add),
       ),
     );
   }

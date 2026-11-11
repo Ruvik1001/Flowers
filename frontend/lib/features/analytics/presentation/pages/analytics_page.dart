@@ -2,7 +2,10 @@ import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
+import 'package:flowers/core/widgets/soft_card.dart';
 import 'package:flowers/features/analytics/data/analytics_repository.dart';
 import 'package:flowers/features/analytics/presentation/cubit/analytics_cubit.dart';
 import 'package:flowers/features/analytics/presentation/cubit/analytics_state.dart';
@@ -24,33 +27,34 @@ class _AnalyticsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Аналитика')),
+    return AppPageScaffold(
+      title: const Text('Аналитика'),
       body: BlocBuilder<AnalyticsCubit, AnalyticsState>(
         builder: (context, state) {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: DropdownButtonFormField<String>(
-                  value: state.reportName,
-                  decoration: const InputDecoration(
-                    labelText: 'Отчёт',
-                    border: OutlineInputBorder(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: SoftCard(
+                  child: DropdownButtonFormField<String>(
+                    value: state.reportName,
+                    decoration: const InputDecoration(
+                      labelText: 'Отчёт',
+                    ),
+                    items: AnalyticsRepository.reportNames
+                        .map(
+                          (name) => DropdownMenuItem(
+                            value: name,
+                            child: Text(Labels.report(name)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (name) {
+                      if (name != null) {
+                        context.read<AnalyticsCubit>().load(name);
+                      }
+                    },
                   ),
-                  items: AnalyticsRepository.reportNames
-                      .map(
-                        (name) => DropdownMenuItem(
-                          value: name,
-                          child: Text(Labels.report(name)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (name) {
-                    if (name != null) {
-                      context.read<AnalyticsCubit>().load(name);
-                    }
-                  },
                 ),
               ),
               Expanded(
@@ -59,12 +63,13 @@ class _AnalyticsView extends StatelessWidget {
                   error: state.error,
                   isEmpty: state.report == null || state.report!.isEmpty,
                   emptyMessage: 'Нет данных отчёта',
+                  emptyIcon: Icons.insights_outlined,
                   onRetry: () => context.read<AnalyticsCubit>().load(),
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.only(top: 4, bottom: 24),
                     children: _flatten(state.report ?? const {})
                         .map(
-                          (row) => ListTile(
+                          (row) => EntityListTile(
                             dense: true,
                             title: Text(row.$1),
                             subtitle: Text(row.$2),

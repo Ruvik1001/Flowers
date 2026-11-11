@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
 import 'package:flowers/core/widgets/photo_upload_field.dart';
 import 'package:flowers/features/cashier/domain/entities/shift.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
@@ -63,8 +65,13 @@ class _SalesViewState extends State<_SalesView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Продажи')),
+    return AppPageScaffold(
+      title: const Text('Продажи'),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-sales',
+        onPressed: () => _showCreateSaleDialog(context),
+        child: const Icon(Icons.add),
+      ),
       body: BlocBuilder<SalesCubit, SalesState>(
         builder: (context, state) {
           return AsyncBody(
@@ -72,13 +79,14 @@ class _SalesViewState extends State<_SalesView> {
             error: state.error,
             isEmpty: state.sales.isEmpty,
             emptyMessage: 'Нет продаж',
+            emptyIcon: Icons.shopping_bag_outlined,
             onRetry: () => context.read<SalesCubit>().load(),
-            child: ListView.separated(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 88),
               itemCount: state.sales.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final sale = state.sales[index];
-                return ListTile(
+                return EntityListTile(
                   title: Text(formatRub(sale.total)),
                   subtitle: Text(_lineSummary(sale)),
                   trailing: IconButton(
@@ -91,10 +99,6 @@ class _SalesViewState extends State<_SalesView> {
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateSaleDialog(context),
-        child: const Icon(Icons.add),
       ),
     );
   }

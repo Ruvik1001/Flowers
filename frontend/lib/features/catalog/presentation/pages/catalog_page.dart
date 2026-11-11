@@ -4,8 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
+import 'package:flowers/core/widgets/status_chip.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/catalog/domain/entities/recipe.dart';
 import 'package:flowers/features/catalog/domain/entities/recipe_item.dart';
@@ -31,37 +34,16 @@ class _CatalogView extends StatelessWidget {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Каталог'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Товары'),
-              Tab(text: 'Рецепты'),
-            ],
-          ),
-        ),
-        body: BlocBuilder<CatalogCubit, CatalogState>(
-          builder: (context, state) {
-            return AsyncBody(
-              loading: state.loading &&
-                  state.products.isEmpty &&
-                  state.recipes.isEmpty,
-              error: state.error,
-              onRetry: () => context.read<CatalogCubit>().load(),
-              child: TabBarView(
-                children: [
-                  _ProductsTab(products: state.products),
-                  _RecipesTab(
-                    recipes: state.recipes,
-                    products: state.products,
-                  ),
-                ],
-              ),
-            );
-          },
+      child: AppPageScaffold(
+        title: const Text('Каталог'),
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: 'Товары'),
+            Tab(text: 'Рецепты'),
+          ],
         ),
         floatingActionButton: FloatingActionButton(
+          heroTag: 'fab-catalog',
           onPressed: () async {
             final choice = await showModalBottomSheet<String>(
               context: context,
@@ -92,6 +74,26 @@ class _CatalogView extends StatelessWidget {
           },
           child: const Icon(Icons.add),
         ),
+        body: BlocBuilder<CatalogCubit, CatalogState>(
+          builder: (context, state) {
+            return AsyncBody(
+              loading: state.loading &&
+                  state.products.isEmpty &&
+                  state.recipes.isEmpty,
+              error: state.error,
+              onRetry: () => context.read<CatalogCubit>().load(),
+              child: TabBarView(
+                children: [
+                  _ProductsTab(products: state.products),
+                  _RecipesTab(
+                    recipes: state.recipes,
+                    products: state.products,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -112,18 +114,18 @@ class _ProductsTab extends StatelessWidget {
         child: SizedBox.shrink(),
       );
     }
-    return ListView.separated(
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 88),
       itemCount: products.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final product = products[index];
-        return ListTile(
+        return EntityListTile(
           title: Text(product.name),
           subtitle: Text(
             '${Labels.productKind(product.kind)} · ${formatRub(product.sellPrice)}',
           ),
           trailing: product.archived
-              ? const Chip(label: Text('Архив'))
+              ? const StatusChip(label: 'Архив', tone: StatusTone.neutral)
               : IconButton(
                   icon: const Icon(Icons.archive_outlined),
                   tooltip: 'В архив',
@@ -167,16 +169,16 @@ class _RecipesTab extends StatelessWidget {
         child: SizedBox.shrink(),
       );
     }
-    return ListView.separated(
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 88),
       itemCount: recipes.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final recipe = recipes[index];
-        return ListTile(
+        return EntityListTile(
           title: Text(_bouquetName(recipe.bouquetId)),
           subtitle: Text('Позиций: ${recipe.items.length}'),
           trailing: recipe.archived
-              ? const Chip(label: Text('Архив'))
+              ? const StatusChip(label: 'Архив', tone: StatusTone.neutral)
               : IconButton(
                   icon: const Icon(Icons.archive_outlined),
                   tooltip: 'В архив',

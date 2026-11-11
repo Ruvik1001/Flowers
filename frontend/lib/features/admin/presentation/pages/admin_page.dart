@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
+import 'package:flowers/core/widgets/section_header.dart';
+import 'package:flowers/core/widgets/soft_card.dart';
 import 'package:flowers/features/admin/domain/entities/role.dart';
 import 'package:flowers/features/admin/presentation/cubit/admin_cubit.dart';
 import 'package:flowers/features/admin/presentation/cubit/admin_state.dart';
@@ -25,8 +29,8 @@ class _AdminView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Админ')),
+    return AppPageScaffold(
+      title: const Text('Админ'),
       body: BlocConsumer<AdminCubit, AdminState>(
         listenWhen: (p, c) =>
             p.lastMessage != c.lastMessage && c.lastMessage != null,
@@ -41,28 +45,40 @@ class _AdminView extends StatelessWidget {
             error: state.error,
             onRetry: () => context.read<AdminCubit>().load(),
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.only(bottom: 32),
               children: [
-                Text(
-                  'Роли',
-                  style: Theme.of(context).textTheme.titleLarge,
+                const SectionHeader(
+                  title: 'Роли',
+                  subtitle: 'Права доступа сотрудников',
                 ),
-                const SizedBox(height: 8),
                 if (state.roles.isEmpty)
-                  const Text('Нет ролей')
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('Нет ролей'),
+                  )
                 else
                   ...state.roles.map(_RoleTile.new),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () => _showCreateUserDialog(context, state.roles),
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Создать пользователя'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _showCreateRoleDialog(context),
-                  icon: const Icon(Icons.security),
-                  label: const Text('Создать роль'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  child: SoftCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: () =>
+                              _showCreateUserDialog(context, state.roles),
+                          icon: const Icon(Icons.person_add),
+                          label: const Text('Создать пользователя'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: () => _showCreateRoleDialog(context),
+                          icon: const Icon(Icons.security),
+                          label: const Text('Создать роль'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -80,8 +96,7 @@ class _RoleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
+    return EntityListTile(
       title: Text(role.name),
       subtitle: Text(Labels.permissionsList(role.permissions)),
     );

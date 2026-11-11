@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flowers/app/shell/home_shell.dart';
+import 'package:flowers/app/theme/app_theme.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
 import 'package:flowers/features/admin/presentation/pages/admin_page.dart';
 import 'package:flowers/features/analytics/presentation/pages/analytics_page.dart';
 import 'package:flowers/features/assembly/presentation/pages/assembly_page.dart';
@@ -13,7 +16,6 @@ import 'package:flowers/features/catalog/presentation/pages/catalog_page.dart';
 import 'package:flowers/features/inventory/presentation/pages/inventory_page.dart';
 import 'package:flowers/features/procurement/presentation/pages/procurement_page.dart';
 import 'package:flowers/features/sales/presentation/pages/sales_page.dart';
-import 'package:flowers/app/shell/home_shell.dart';
 
 class AuthRefresh extends ChangeNotifier {
   void ping() => notifyListeners();
@@ -88,24 +90,58 @@ class MoreHubPage extends StatelessWidget {
       ('/admin', 'Админ', Icons.admin_panel_settings_outlined),
     ];
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Ещё')),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
         children: [
           for (final item in items)
-            ListTile(
-              leading: Icon(item.$3),
+            EntityListTile(
+              leading: _MoreIcon(icon: item.$3),
               title: Text(item.$2),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.muted,
+              ),
               onTap: () => context.push(item.$1),
             ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
+          const SizedBox(height: 8),
+          EntityListTile(
+            leading: _MoreIcon(
+              icon: Icons.logout,
+              color: const Color(0xFFB3261E),
+              background: const Color(0xFFB3261E).withValues(alpha: 0.10),
+            ),
             title: const Text('Выйти'),
             onTap: () => context.read<AuthCubit>().logout(),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MoreIcon extends StatelessWidget {
+  const _MoreIcon({
+    required this.icon,
+    this.color = AppColors.leaf,
+    this.background,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: background ?? AppColors.mist,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 22),
     );
   }
 }

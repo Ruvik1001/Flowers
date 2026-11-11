@@ -2,8 +2,10 @@ import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/widgets/app_message.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/core/widgets/entity_list_tile.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/procurement/domain/entities/supplier.dart';
 import 'package:flowers/features/procurement/domain/entities/supply.dart';
@@ -30,37 +32,16 @@ class _ProcurementView extends StatelessWidget {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Закупки'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Поставщики'),
-              Tab(text: 'Поставки'),
-            ],
-          ),
-        ),
-        body: BlocBuilder<ProcurementCubit, ProcurementState>(
-          builder: (context, state) {
-            return AsyncBody(
-              loading: state.loading &&
-                  state.suppliers.isEmpty &&
-                  state.supplies.isEmpty,
-              error: state.error,
-              onRetry: () => context.read<ProcurementCubit>().load(),
-              child: TabBarView(
-                children: [
-                  _SuppliersTab(suppliers: state.suppliers),
-                  _SuppliesTab(
-                    supplies: state.supplies,
-                    suppliers: state.suppliers,
-                  ),
-                ],
-              ),
-            );
-          },
+      child: AppPageScaffold(
+        title: const Text('Закупки'),
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: 'Поставщики'),
+            Tab(text: 'Поставки'),
+          ],
         ),
         floatingActionButton: FloatingActionButton(
+          heroTag: 'fab-procurement',
           onPressed: () async {
             final choice = await showModalBottomSheet<String>(
               context: context,
@@ -91,6 +72,26 @@ class _ProcurementView extends StatelessWidget {
           },
           child: const Icon(Icons.add),
         ),
+        body: BlocBuilder<ProcurementCubit, ProcurementState>(
+          builder: (context, state) {
+            return AsyncBody(
+              loading: state.loading &&
+                  state.suppliers.isEmpty &&
+                  state.supplies.isEmpty,
+              error: state.error,
+              onRetry: () => context.read<ProcurementCubit>().load(),
+              child: TabBarView(
+                children: [
+                  _SuppliersTab(suppliers: state.suppliers),
+                  _SuppliesTab(
+                    supplies: state.supplies,
+                    suppliers: state.suppliers,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -104,16 +105,22 @@ class _SuppliersTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (suppliers.isEmpty) {
-      return const Center(child: Text('Нет поставщиков'));
+      return const AsyncBody(
+        loading: false,
+        isEmpty: true,
+        emptyMessage: 'Нет поставщиков',
+        emptyIcon: Icons.store_outlined,
+        child: SizedBox.shrink(),
+      );
     }
-    return ListView.separated(
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 88),
       itemCount: suppliers.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final s = suppliers[index];
         final phone =
             s.phone?.isNotEmpty == true ? s.phone! : 'без телефона';
-        return ListTile(
+        return EntityListTile(
           title: Text(s.name),
           subtitle: Text(phone),
         );
@@ -137,14 +144,20 @@ class _SuppliesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (supplies.isEmpty) {
-      return const Center(child: Text('Нет поставок'));
+      return const AsyncBody(
+        loading: false,
+        isEmpty: true,
+        emptyMessage: 'Нет поставок',
+        emptyIcon: Icons.local_shipping_outlined,
+        child: SizedBox.shrink(),
+      );
     }
-    return ListView.separated(
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 88),
       itemCount: supplies.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final supply = supplies[index];
-        return ListTile(
+        return EntityListTile(
           title: Text(_supplierName(supply.supplierId)),
           subtitle: Text('Линий: ${supply.lines.length}'),
           trailing: IconButton(

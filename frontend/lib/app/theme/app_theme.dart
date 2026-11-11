@@ -8,12 +8,12 @@ class AppColors {
   static const blushSoft = Color(0xFFE8B4BC);
   static const paper = Color(0xFFF6F1E8);
   static const mist = Color(0xFFE8E2D6);
-  static const ink = Color(0xFF1A2420);
-  static const muted = Color(0xFF5C6A64);
-  static const success = Color(0xFF3D7A5A);
-  static const warning = Color(0xFFB8843C);
-  static const surfaceElevated = Color(0xFFFAF7F2);
-  static const outline = Color(0xFFD5CFC3);
+  static const ink = Color(0xFF0B100E);
+  static const muted = Color(0xFF1C2622);
+  static const success = Color(0xFF2F6B4D);
+  static const warning = Color(0xFF9A6A28);
+  static const surfaceElevated = Color(0xFFFFFFFF);
+  static const outline = Color(0xFFC8C1B4);
 }
 
 class AppRadii {
@@ -44,69 +44,85 @@ ThemeData buildAppTheme() {
     displayLarge: const TextStyle(
       fontFamily: displayFamily,
       color: AppColors.ink,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
       letterSpacing: -0.5,
       fontSize: 40,
     ),
     displayMedium: const TextStyle(
       fontFamily: displayFamily,
       color: AppColors.ink,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
       fontSize: 32,
     ),
     headlineLarge: const TextStyle(
       fontFamily: displayFamily,
       color: AppColors.leafDark,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
       fontSize: 34,
       height: 1.15,
     ),
     headlineMedium: const TextStyle(
       fontFamily: displayFamily,
       color: AppColors.leafDark,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
       fontSize: 22,
     ),
     titleLarge: const TextStyle(
       fontFamily: bodyFamily,
       color: AppColors.ink,
       fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
       fontSize: 18,
     ),
     titleMedium: const TextStyle(
       fontFamily: bodyFamily,
       color: AppColors.ink,
-      fontWeight: FontWeight.w600,
-      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
+      fontSize: 17,
     ),
     bodyLarge: const TextStyle(
       fontFamily: bodyFamily,
       color: AppColors.ink,
+      fontWeight: FontWeight.w600,
+      fontVariations: [FontVariation('wght', 600)],
       fontSize: 16,
       height: 1.4,
     ),
     bodyMedium: const TextStyle(
       fontFamily: bodyFamily,
       color: AppColors.ink,
-      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      fontVariations: [FontVariation('wght', 600)],
+      fontSize: 15,
       height: 1.4,
     ),
     bodySmall: const TextStyle(
       fontFamily: bodyFamily,
-      color: AppColors.muted,
-      fontSize: 13,
+      color: AppColors.ink,
+      fontWeight: FontWeight.w600,
+      fontVariations: [FontVariation('wght', 600)],
+      fontSize: 14,
+      height: 1.35,
     ),
     labelLarge: const TextStyle(
       fontFamily: bodyFamily,
+      color: AppColors.ink,
       fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
       letterSpacing: 0.2,
       fontSize: 14,
     ),
     labelMedium: const TextStyle(
       fontFamily: bodyFamily,
-      fontWeight: FontWeight.w600,
-      color: AppColors.muted,
-      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      fontVariations: [FontVariation('wght', 700)],
+      color: AppColors.ink,
+      fontSize: 13,
     ),
   );
 
@@ -119,6 +135,7 @@ ThemeData buildAppTheme() {
     onSecondary: Colors.white,
     surface: AppColors.paper,
     onSurface: AppColors.ink,
+    onSurfaceVariant: AppColors.muted,
     surfaceContainerHighest: AppColors.mist,
     outline: AppColors.outline,
     error: const Color(0xFFB3261E),
@@ -141,27 +158,33 @@ ThemeData buildAppTheme() {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: Colors.transparent,
-      indicatorColor: AppColors.leaf.withValues(alpha: 0.14),
+      indicatorColor: AppColors.leaf.withValues(alpha: 0.16),
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
       elevation: 0,
-      height: 68,
+      height: 74,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
-        return textTheme.labelMedium?.copyWith(
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.leafDark : AppColors.muted,
+        return TextStyle(
+          fontFamily: bodyFamily,
+          fontSize: 12,
+          height: 1.15,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+          color: selected ? AppColors.leafDark : AppColors.ink,
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return IconThemeData(
-          color: selected ? AppColors.leaf : AppColors.muted,
-          size: 22,
+          color: selected ? AppColors.leaf : AppColors.ink,
+          size: 24,
         );
       }),
     ),
     tabBarTheme: TabBarThemeData(
       labelColor: AppColors.leafDark,
-      unselectedLabelColor: AppColors.muted,
+      unselectedLabelColor: AppColors.ink,
       indicatorColor: AppColors.leaf,
       dividerColor: Colors.transparent,
       labelStyle: textTheme.labelLarge,
@@ -221,7 +244,7 @@ ThemeData buildAppTheme() {
         borderRadius: BorderRadius.circular(AppRadii.sm),
         borderSide: const BorderSide(color: AppColors.leaf, width: 1.5),
       ),
-      labelStyle: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+      labelStyle: textTheme.bodyMedium?.copyWith(color: AppColors.ink),
     ),
     cardTheme: CardThemeData(
       color: AppColors.surfaceElevated.withValues(alpha: 0.88),

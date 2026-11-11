@@ -44,16 +44,21 @@ class EntityListTile extends StatelessWidget {
               children: [
                 DefaultTextStyle(
                   style: theme.textTheme.titleMedium!.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
+                    fontVariations: const [FontVariation('wght', 800)],
                     color: AppColors.ink,
+                    fontSize: 17,
                   ),
                   child: title,
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   DefaultTextStyle(
-                    style: theme.textTheme.bodySmall!.copyWith(
-                      color: AppColors.muted,
+                    style: theme.textTheme.bodyMedium!.copyWith(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w600,
+                      fontVariations: const [FontVariation('wght', 600)],
+                      fontSize: 15,
                     ),
                     child: subtitle!,
                   ),

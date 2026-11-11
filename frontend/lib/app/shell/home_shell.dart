@@ -17,26 +17,31 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 420;
+    final sidePad = compact ? 10.0 : 16.0;
+    final bottomPad = 12.0 + MediaQuery.paddingOf(context).bottom;
+
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: navigationShell,
         bottomNavigationBar: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.fromLTRB(sidePad, 0, sidePad, bottomPad),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.surfaceElevated.withValues(alpha: 0.96),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(AppRadii.lg),
-              border: Border.all(
-                color: AppColors.outline.withValues(alpha: 0.7),
-              ),
-              boxShadow: softShadow(opacity: 0.10),
+              border: Border.all(color: AppColors.outline),
+              boxShadow: softShadow(opacity: 0.12),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadii.lg),
               child: NavigationBar(
+                height: compact ? 76 : 74,
                 selectedIndex: navigationShell.currentIndex,
                 onDestinationSelected: _goBranch,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 destinations: const [
                   NavigationDestination(
                     icon: Icon(Icons.menu_book_outlined),

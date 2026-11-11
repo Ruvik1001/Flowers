@@ -18,6 +18,7 @@ from shared.fastapi_ext import (
 from shared.utils.ids import new_id
 
 from app.config import Settings, settings
+from app.rbac import enforce_gateway_rbac
 
 
 class SlidingWindowLimiter:
@@ -83,10 +84,11 @@ def create_app(
         if target is None:
             raise AppError("service_not_found", "Unknown service", status_code=404)
         is_public = (service, path) in public_paths
-        claims = {}
+        claims: dict = {}
         if not is_public:
             claims = _access_token(request, cfg.jwt_secret)
             app.state.limiter.check(str(claims.get("sub") or request.client.host if request.client else "anon"))
+            enforce_gateway_rbac(service, request.method, path, claims)
         request_id = request.headers.get("X-Request-Id") or new_id()
         headers = {"X-Request-Id": request_id}
         if authorization := request.headers.get("Authorization"):

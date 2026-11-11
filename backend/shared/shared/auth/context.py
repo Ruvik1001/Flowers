@@ -14,7 +14,9 @@ class AuthUser:
     is_admin: bool = False
 
     def has_permission(self, permission: str) -> bool:
-        return self.is_admin or permission in self.permissions
+        if self.is_admin or "*" in self.permissions:
+            return True
+        return permission in self.permissions
 
 
 def require_permissions(user: AuthUser, *permissions: str) -> None:

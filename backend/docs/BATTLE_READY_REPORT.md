@@ -163,14 +163,14 @@ Persistence is enabled automatically when `DATABASE_URL` is PostgreSQL (`persist
 * Request path: `OutboxStreamBus.publish()` (built by `build_outbox_bus`) stages the event with `OutboxPublisher.enqueue()` (`INSERT ... ON CONFLICT DO NOTHING` on `idempotency_key`) and commits in a short session – the request never talks to Redis. Without persistence it delegates to the inner bus.
 * Delivery: `OutboxWorker` polls unpublished rows (`FOR UPDATE SKIP LOCKED`, ordered by `created_at`), publishes each to the Redis stream `EVENT_STREAM` (`domain-events`) and sets `published_at` only after the bus accepted it → **at-least-once** delivery; consumers dedupe by `event_id`/`idempotency_key`.
 * The worker runs as an asyncio background task in each publishing service's lifespan (`outbox_lifespan`): identity, procurement, assembly, sales, cashier. Poll interval `OUTBOX_POLL_INTERVAL` (default 1 s).
-* Known limitation: the outbox row is written in its own transaction right after the domain write (not in the same DB transaction as the `PersistMap` write), so a crash between the two can lose the event; a true same-transaction outbox would need repository-level transactions.
+* Publishing paths wrap domain PersistMap writes + `bus.publish` in `unit_of_work()` so outbox enqueue shares the same DB transaction when Postgres persistence is on.
 
 ### 9.4 Continuous audit / analytics consumers
 
 * `audit` and `analytics` subscribe to `domain-events` via `ConsumerRunner` (`consumer_lifespan`) – a background loop that drains the Redis stream group repeatedly (`CONSUMER_POLL_INTERVAL`, default 0.5 s). It is enabled by `CONSUMER_LOOP=1` (set in the prod overlay) and by default whenever `REDIS_URL` is configured.
 * `POST /api/v1/{audit,analytics}/internal/drain` stays as an ops/test hook, serialised with the loop by a lock.
 * Both projections are idempotent: audit stores events with a unique `idempotency_key`; analytics keeps a `seen` set and snapshots its state to `analytics.snapshots` after every event, so both survive restarts and replays.
-* Currently emitted event types: `SaleCompleted`, `ShiftClosed`, `SupplyAccepted`, `UserRoleChanged`, `AssemblyCompleted`. `StockChanged` / `WriteOffCompleted` are defined and handled by analytics but not yet emitted by inventory (so `stock-turnover` and `write-offs` reports stay empty).
+* Emitted event types: `SaleCompleted` (with COGS `cost` + `shift_id`), `ShiftClosed`, `SupplyAccepted`, `UserRoleChanged`, `AssemblyCompleted`, `StockChanged`, `WriteOffCompleted`.
 
 ### 9.5 Production overlay, MonitoringPLTG, readiness
 
@@ -193,8 +193,11 @@ Flow: log in → create product, supplier, lot, shift, sale → `docker compose 
 
 ### 9.8 Remaining backlog after persistence
 
-1. Make outbox enqueue part of the same DB transaction as the domain write (see 9.3 limitation).
-2. Emit `StockChanged` / `WriteOffCompleted` from inventory; report real `cost` (COGS) and `shift_id` in `SaleCompleted`.
-3. Translate inventory `409 insufficient_stock` into a client error in sales/assembly/procurement (currently surfaces as `500`).
-4. Enforce RBAC permissions in downstream services (today only identity checks permissions; others only require a valid access token).
-5. Per-service Alembic histories and a shared test run of the persistence smoke in CI (the smoke script is run manually against the compose stack).
+> Closed in follow-up hardening (same-TX outbox, inventory events, 409 mapping, gateway RBAC). Still open:
+
+1. ~~Make outbox enqueue part of the same DB transaction as the domain write.~~ Done – `unit_of_work()` + session context; `OutboxStreamBus.publish` joins the active session.
+2. ~~Emit `StockChanged` / `WriteOffCompleted`; real `cost` / `shift_id` on `SaleCompleted`.~~ Done.
+3. ~~Translate inventory `409` in sales/assembly/procurement.~~ Done – `raise_for_inventory_response`.
+4. ~~Enforce RBAC on FE-facing routes.~~ Done at gateway edge (`app/rbac.py`); internal S2S stays on the docker network.
+5. Per-service Alembic histories and CI job for `smoke_persist_restart.py` (still manual/ops).
+6. True distributed saga for assembly/sales multi-line inventory (best-effort compensate on failure is in place).

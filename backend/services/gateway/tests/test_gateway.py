@@ -12,8 +12,10 @@ from app.main import SlidingWindowLimiter, create_app
 SECRET = "test-secret"
 
 
-def token() -> str:
-    return create_access_token("user-1", secret=SECRET)
+def token(**claims) -> str:
+    payload = {"permissions": ["*"], "is_admin": True}
+    payload.update(claims)
+    return create_access_token("user-1", secret=SECRET, claims=payload)
 
 
 def test_health_and_proxy_forwards_headers_and_body():
@@ -94,3 +96,16 @@ def test_public_login_does_not_require_jwt():
         )
     assert response.status_code == 200
     assert response.json()["access_token"] == "a"
+
+
+def test_gateway_rbac_rejects_missing_permission():
+    cfg = Settings(jwt_secret=SECRET, service_urls={"catalog": "http://catalog"})
+    weak = token(permissions=["sales.read"], is_admin=False)
+    with TestClient(create_app(cfg, httpx.AsyncClient())) as api:
+        response = api.post(
+            "/api/v1/catalog/products",
+            headers={"Authorization": f"Bearer {weak}"},
+            json={"name": "Rose"},
+        )
+    assert response.status_code == 403
+    assert response.json()["code"] == "forbidden"

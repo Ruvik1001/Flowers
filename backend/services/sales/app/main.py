@@ -35,6 +35,7 @@ class PaymentIn(BaseModel):
 class SaleIn(BaseModel):
     lines: list[LineIn] = Field(min_length=1)
     payments: list[PaymentIn] = Field(min_length=1)
+    shift_id: str | None = None
 
 
 class RefundIn(BaseModel):
@@ -81,6 +82,7 @@ def complete(body: SaleIn):
         service.complete(
             [x.model_dump() for x in body.lines],
             [x.model_dump() for x in body.payments],
+            shift_id=body.shift_id,
         )
     )
 

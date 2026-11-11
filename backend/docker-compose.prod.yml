@@ -1,0 +1,21 @@
+services:
+  postgres:
+    restart: always
+  redis:
+    restart: always
+  otel-collector:
+    restart: always
+  gateway:
+    restart: always
+    environment:
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+  identity: {restart: always}
+  catalog: {restart: always}
+  inventory: {restart: always}
+  procurement: {restart: always}
+  assembly: {restart: always}
+  sales: {restart: always}
+  cashier: {restart: always}
+  audit: {restart: always}
+  analytics: {restart: always}
+  files: {restart: always}

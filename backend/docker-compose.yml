@@ -1,0 +1,109 @@
+x-service: &service
+  restart: unless-stopped
+  environment:
+    DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://flowers:flowers@postgres:5432/flowers}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    JWT_SECRET: ${JWT_SECRET:-change-me}
+    EVENT_STREAM: ${EVENT_STREAM:-domain-events}
+    OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://otel-collector:4317}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flowers}
+      POSTGRES_USER: ${POSTGRES_USER:-flowers}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowers}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flowers}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.113.0
+    command: ["--config=/etc/otel/config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel/config.yml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  gateway:
+    <<: *service
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "8080:8000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-0}
+      IDENTITY_URL: http://identity:8000
+      CATALOG_URL: http://catalog:8000
+      INVENTORY_URL: http://inventory:8000
+      PROCUREMENT_URL: http://procurement:8000
+      ASSEMBLY_URL: http://assembly:8000
+      SALES_URL: http://sales:8000
+      CASHIER_URL: http://cashier:8000
+      AUDIT_URL: http://audit:8000
+      ANALYTICS_URL: http://analytics:8000
+      FILES_URL: http://files:8000
+
+  identity:
+    <<: *service
+    build: {context: ., dockerfile: services/identity/Dockerfile}
+  catalog:
+    <<: *service
+    build: {context: ., dockerfile: services/catalog/Dockerfile}
+  inventory:
+    <<: *service
+    build: {context: ., dockerfile: services/inventory/Dockerfile}
+  procurement:
+    <<: *service
+    build: {context: ., dockerfile: services/procurement/Dockerfile}
+  assembly:
+    <<: *service
+    build: {context: ., dockerfile: services/assembly/Dockerfile}
+  sales:
+    <<: *service
+    build: {context: ., dockerfile: services/sales/Dockerfile}
+  cashier:
+    <<: *service
+    build: {context: ., dockerfile: services/cashier/Dockerfile}
+  audit:
+    <<: *service
+    build: {context: ., dockerfile: services/audit/Dockerfile}
+  analytics:
+    <<: *service
+    build: {context: ., dockerfile: services/analytics/Dockerfile}
+  files:
+    <<: *service
+    build: {context: ., dockerfile: services/files/Dockerfile}
+    environment:
+      UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
+    volumes:
+      - uploads:/data/uploads
+
+volumes:
+  postgres-data:
+  redis-data:
+  uploads:

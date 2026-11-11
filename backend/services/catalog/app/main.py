@@ -1,0 +1,57 @@
+from decimal import Decimal
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+from shared.fastapi_ext import install_exception_handlers, install_request_context_middleware
+from app.application import CatalogService
+from app.config import settings
+from app.domain import ProductKind
+from app.infrastructure.store import store
+
+app = FastAPI(title="Flowers Catalog")
+install_exception_handlers(app)
+install_request_context_middleware(app, settings.service_name)
+service = CatalogService(store)
+
+
+class ProductIn(BaseModel):
+    name: str
+    kind: ProductKind
+    sell_price: Decimal = Field(ge=0)
+
+
+class ItemIn(BaseModel):
+    product_id: str
+    quantity: Decimal = Field(gt=0)
+
+
+class RecipeIn(BaseModel):
+    bouquet_id: str
+    items: list[ItemIn] = Field(min_length=1)
+
+
+@app.get("/health")
+def health(): return {"status": "ok"}
+
+
+@app.get("/api/v1/products")
+def products(include_archived: bool = False): return [x for x in store.products.values() if include_archived or not x.archived]
+
+
+@app.post("/api/v1/products", status_code=201)
+def create_product(body: ProductIn): return service.create_product(**body.model_dump())
+
+
+@app.post("/api/v1/products/{product_id}/archive")
+def archive_product(product_id: str): return service.archive_product(product_id)
+
+
+@app.get("/api/v1/recipes")
+def recipes(include_archived: bool = False): return [x for x in store.recipes.values() if include_archived or not x.archived]
+
+
+@app.post("/api/v1/recipes", status_code=201)
+def create_recipe(body: RecipeIn): return service.create_recipe(body.bouquet_id, [x.model_dump() for x in body.items])
+
+
+@app.post("/api/v1/recipes/{recipe_id}/archive")
+def archive_recipe(recipe_id: str): return service.archive_recipe(recipe_id)

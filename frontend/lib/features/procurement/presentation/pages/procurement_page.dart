@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
+import 'package:flowers/core/widgets/app_dialog.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -388,18 +389,20 @@ Future<void> _showCreateSupplierDialog(BuildContext context) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Новый поставщик'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(labelText: 'Название'),
-          ),
-          TextField(
-            controller: phoneCtrl,
-            decoration: const InputDecoration(labelText: 'Телефон'),
-          ),
-        ],
+      content: AppDialogScrollBody(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Название'),
+            ),
+            TextField(
+              controller: phoneCtrl,
+              decoration: const InputDecoration(labelText: 'Телефон'),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -460,7 +463,7 @@ Future<void> _showCreateSupplyDialog(BuildContext context) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новая поставка'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -569,23 +572,25 @@ Future<void> _showAcceptDialog(BuildContext context, Supply supply) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Принять линию'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SupplyLineProductDropdown(
-                  productIds: productIds,
-                  products: products,
-                  value: productId,
-                  onChanged: (v) => setState(() => productId = v),
-                ),
-                TextField(
-                  controller: qtyCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+            content: AppDialogScrollBody(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SupplyLineProductDropdown(
+                    productIds: productIds,
+                    products: products,
+                    value: productId,
+                    onChanged: (v) => setState(() => productId = v),
                   ),
-                  decoration: const InputDecoration(labelText: 'Количество'),
-                ),
-              ],
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Количество'),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(

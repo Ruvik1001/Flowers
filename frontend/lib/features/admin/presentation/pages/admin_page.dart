@@ -2,6 +2,7 @@ import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
+import 'package:flowers/core/widgets/app_dialog.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -119,7 +120,7 @@ Future<void> _showCreateUserDialog(
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новый пользователь'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -202,43 +203,40 @@ Future<void> _showCreateRoleDialog(BuildContext context) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новая роль'),
-            content: SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameCtrl,
-                      decoration:
-                          const InputDecoration(labelText: 'Название'),
+            content: AppDialogScrollBody(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Название'),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Права',
+                      style: Theme.of(ctx).textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Права',
-                        style: Theme.of(ctx).textTheme.titleSmall,
-                      ),
+                  ),
+                  for (final code in Labels.knownPermissions)
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: selected.contains(code),
+                      title: Text(Labels.permission(code)),
+                      onChanged: (v) {
+                        setState(() {
+                          if (v == true) {
+                            selected.add(code);
+                          } else {
+                            selected.remove(code);
+                          }
+                        });
+                      },
                     ),
-                    for (final code in Labels.knownPermissions)
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: selected.contains(code),
-                        title: Text(Labels.permission(code)),
-                        onChanged: (v) {
-                          setState(() {
-                            if (v == true) {
-                              selected.add(code);
-                            } else {
-                              selected.remove(code);
-                            }
-                          });
-                        },
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
             actions: [

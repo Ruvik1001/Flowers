@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
+import 'package:flowers/core/widgets/app_dialog.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -415,7 +416,7 @@ Future<void> _showCreateLotDialog(BuildContext context) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новая партия'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

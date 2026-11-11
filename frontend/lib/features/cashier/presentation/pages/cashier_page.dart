@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
+import 'package:flowers/core/widgets/app_dialog.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -120,21 +121,23 @@ Future<void> _showOpenDialog(BuildContext context) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Открыть смену'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Кассир: ${user.email}'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: cashCtrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Наличные в кассе'),
-          ),
-        ],
+      content: AppDialogScrollBody(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Кассир: ${user.email}'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: cashCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Наличные в кассе'),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -176,22 +179,24 @@ Future<void> _showCashDialog(BuildContext context, Shift shift) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Наличные'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Сумма'),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Возврат'),
-                  value: refund,
-                  onChanged: (v) => setState(() => refund = v),
-                ),
-              ],
+            content: AppDialogScrollBody(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Сумма'),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Возврат'),
+                    value: refund,
+                    onChanged: (v) => setState(() => refund = v),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -235,10 +240,12 @@ Future<void> _showCloseDialog(BuildContext context, Shift shift) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Закрыть смену'),
-      content: TextField(
-        controller: actualCtrl,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(labelText: 'Факт в кассе'),
+      content: AppDialogScrollBody(
+        child: TextField(
+          controller: actualCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: 'Факт в кассе'),
+        ),
       ),
       actions: [
         TextButton(

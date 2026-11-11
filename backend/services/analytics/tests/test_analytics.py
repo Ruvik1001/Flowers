@@ -83,3 +83,19 @@ def test_unknown_events_are_ignored_and_unknown_report_raises():
     with pytest.raises(KeyError):
         projection.report("missing")
     assert _money(None) == 0
+
+
+def test_continuous_consumer_loop_projects_without_drain_call():
+    import time
+
+    bus = InMemoryStreamBus()
+    cfg = Settings(stream_name="events", consumer_group="analytics-loop")
+    with TestClient(create_app(cfg, bus=bus, consumer_loop=True)) as client:
+        bus.publish("events", make(EventNames.SALE_COMPLETED, {"revenue": 10}, "loop-sale"))
+        for _ in range(200):
+            items = client.get("/api/v1/reports/revenue-by-shift").json()["items"]
+            if items:
+                break
+            time.sleep(0.01)
+        assert items[0]["key"] == "unassigned"
+        assert client.post("/api/v1/internal/drain").json()["processed"] == 0

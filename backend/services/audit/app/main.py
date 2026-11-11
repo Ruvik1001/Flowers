@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import FastAPI, Query
 from redis import Redis
 
 from shared.fastapi_ext import (
     install_exception_handlers,
+    install_readiness,
     install_request_context_middleware,
 )
+from shared.messaging.consumer import ConsumerRunner, consumer_lifespan, consumer_loop_default
 from shared.messaging.events import DomainEvent
 from shared.messaging.streams import InMemoryStreamBus, RedisStreamBus, StreamBus
 
@@ -25,13 +29,22 @@ def create_app(
     *,
     bus: StreamBus | None = None,
     audit_log: AuditLog | None = None,
+    consumer_loop: bool | None = None,
 ) -> FastAPI:
     cfg = config or settings
-    app = FastAPI(title="Flowers Audit")
-    app.state.bus = bus or default_bus(cfg)
-    app.state.audit_log = audit_log or AuditLog()
-    app.state.bus.subscribe(cfg.stream_name, cfg.consumer_group, app.state.audit_log.append)
+    resolved_bus = bus or default_bus(cfg)
+    log = audit_log or AuditLog()
+    resolved_bus.subscribe(cfg.stream_name, cfg.consumer_group, log.append)
+    runner = ConsumerRunner(resolved_bus, cfg.stream_name, cfg.consumer_group)
+    loop_enabled = (
+        consumer_loop if consumer_loop is not None else consumer_loop_default(cfg.redis_url)
+    )
+    app = FastAPI(title="Flowers Audit", lifespan=consumer_lifespan(runner, enabled=loop_enabled))
+    app.state.bus = resolved_bus
+    app.state.audit_log = log
+    app.state.consumer = runner
     install_exception_handlers(app)
+    install_readiness(app, cfg.service_name, check_db=True, check_redis=True)
     install_request_context_middleware(app, cfg.service_name)
 
     @app.get("/api/v1/health")
@@ -45,7 +58,7 @@ def create_app(
 
     @app.post("/api/v1/internal/drain")
     async def drain(count: int = Query(100, ge=1, le=1000)) -> dict[str, int]:
-        processed = app.state.bus.drain(cfg.stream_name, cfg.consumer_group, count=count)
+        processed = await asyncio.to_thread(runner.drain_once, count)
         return {"processed": processed}
 
     @app.get("/api/v1/audit")

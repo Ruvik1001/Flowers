@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextvars import ContextVar
 from typing import Any
 
@@ -12,21 +13,36 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
+def _use_console_exporter(otlp_endpoint: str | None) -> bool:
+    """Console is secondary in prod when OTLP is configured."""
+    flag = os.getenv("OTEL_CONSOLE", "").lower()
+    if flag in {"1", "true", "yes"}:
+        return True
+    if flag in {"0", "false", "no"}:
+        return False
+    app_env = os.getenv("APP_ENV", os.getenv("ENV", "local")).lower()
+    if app_env in {"prod", "production"} and otlp_endpoint:
+        return False
+    return True
+
+
 def init_telemetry(service_name: str, *, otlp_endpoint: str | None = None) -> TracerProvider:
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
-    # Console exporter keeps local/dev useful without collector.
-    provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-    if otlp_endpoint:
+    if _use_console_exporter(otlp_endpoint):
+        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+    endpoint = otlp_endpoint or os.getenv("OTLP_ENDPOINT") or None
+    if endpoint:
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
             provider.add_span_processor(
-                BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
+                BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
             )
         except Exception:
-            # Optional dependency path; console exporter remains.
-            pass
+            # Optional dependency path; console exporter may remain.
+            if not _use_console_exporter(endpoint):
+                provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     trace.set_tracer_provider(provider)
     structlog.configure(
         processors=[

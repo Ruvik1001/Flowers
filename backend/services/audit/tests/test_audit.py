@@ -50,3 +50,20 @@ def test_stream_consumer_and_pagination():
     with TestClient(create_app(cfg, bus=bus)) as client:
         assert client.post("/api/v1/internal/drain?count=10").json() == {"processed": 1}
         assert client.get("/api/v1/audit?offset=1").json()["items"] == []
+
+
+def test_continuous_consumer_loop_processes_stream_without_drain_call():
+    import time
+
+    bus = InMemoryStreamBus()
+    cfg = Settings(stream_name="events", consumer_group="audit-loop")
+    log = AuditLog()
+    with TestClient(create_app(cfg, bus=bus, audit_log=log, consumer_loop=True)) as client:
+        bus.publish("events", event("loop-1"))
+        for _ in range(200):
+            if client.get("/api/v1/audit").json()["count"]:
+                break
+            time.sleep(0.01)
+        assert client.get("/api/v1/audit").json()["items"][0]["event_id"] == "loop-1"
+        # ops drain endpoint still works alongside the loop
+        assert client.post("/api/v1/internal/drain").json() == {"processed": 0}

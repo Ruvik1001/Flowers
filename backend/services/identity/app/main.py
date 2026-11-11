@@ -5,14 +5,19 @@ from pydantic import BaseModel, Field
 
 from shared.auth import AuthUser, decode_token
 from shared.errors import AppError
-from shared.fastapi_ext import install_exception_handlers, install_request_context_middleware
-from shared.messaging import InMemoryStreamBus
+from shared.fastapi_ext import (
+    install_exception_handlers,
+    install_readiness,
+    install_request_context_middleware,
+)
+from shared.persistence.outbox_bus import build_outbox_bus, outbox_lifespan
 
 from app.application.auth_service import AuthService
 from app.config import settings
 from app.infrastructure.store import store
 
-bus = InMemoryStreamBus()
+# Request path publishes into the transactional outbox; the lifespan worker relays to Redis.
+bus = build_outbox_bus(settings.service_name, settings.redis_url or None, database_url=settings.database_url)
 auth_service = AuthService(bus=bus)
 
 
@@ -38,8 +43,9 @@ class RefreshRequest(BaseModel):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Flowers Identity")
+    app = FastAPI(title="Flowers Identity", lifespan=outbox_lifespan(bus))
     install_exception_handlers(app)
+    install_readiness(app, settings.service_name, check_db=True, check_redis=True)
     install_request_context_middleware(app, settings.service_name)
     auth_service.ensure_bootstrap()
 

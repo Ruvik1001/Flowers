@@ -30,7 +30,7 @@ def test_inventory_api_end_to_end():
     store.lots.clear(); store.write_offs.clear(); store.counts.clear()
     from app.main import app
     client = TestClient(app, raise_server_exceptions=False)
-    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/health").json()["status"] == "ok"
     first = client.post("/api/v1/lots", json={"product_id": "rose", "quantity": "5", "unit_cost": "12.345", "expires_on": str(date.today())})
     assert first.status_code == 201
     assert client.get("/api/v1/inventory/expired").json()

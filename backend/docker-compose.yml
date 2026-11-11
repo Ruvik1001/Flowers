@@ -55,13 +55,16 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://flowers:flowers@postgres:5432/flowers}
       DB_INIT_SQL: /app/db/init.sql
+      # auto: alembic upgrade head (db/alembic), falling back to db/init.sql if alembic is missing.
+      # sql: apply db/init.sql only. Alembic 0001 is equivalent to init.sql.
+      DB_MIGRATE_MODE: ${DB_MIGRATE_MODE:-auto}
     volumes:
       - ./db:/app/db:ro
       - ./scripts:/app/scripts:ro
     command:
       - bash
       - -lc
-      - pip install --no-cache-dir 'psycopg[binary]>=3.1' && python /app/scripts/migrate_standalone.py
+      - pip install --no-cache-dir 'psycopg[binary]>=3.1' 'sqlalchemy>=2.0' 'alembic>=1.13' && python /app/scripts/migrate_standalone.py
     depends_on:
       postgres:
         condition: service_healthy

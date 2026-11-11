@@ -12,6 +12,7 @@ from shared.auth.jwt import decode_token
 from shared.errors import AppError
 from shared.fastapi_ext import (
     install_exception_handlers,
+    install_readiness,
     install_request_context_middleware,
 )
 from shared.utils.ids import new_id
@@ -60,6 +61,7 @@ def create_app(
     app = FastAPI(title="Flowers Gateway", lifespan=lifespan)
     app.state.limiter = SlidingWindowLimiter(cfg.rate_limit_per_minute)
     install_exception_handlers(app)
+    install_readiness(app, "gateway")
     install_request_context_middleware(app, cfg.service_name)
 
     @app.get("/api/v1/health")

@@ -1,55 +1,131 @@
 from __future__ import annotations
 
+from sqlalchemy import delete, select
+
 from shared.auth import hash_password
 from shared.errors import AppError
+from shared.persistence.models import RoleRow, UserRow
+from shared.persistence.persist_map import PersistMap
+from shared.persistence.runtime import db_session, persistence_enabled
 from shared.utils.ids import new_id
 
 from app.domain.entities import Role, User
 from app.domain.rbac import merge_permissions
 
 
+def _role_from_row(row: RoleRow) -> Role:
+    return Role(id=row.id, name=row.name, permissions=list(row.permissions or []))
+
+
+def _user_from_row(row: UserRow) -> User:
+    return User(
+        id=row.id,
+        email=row.email,
+        password_hash=row.password_hash,
+        is_admin=bool(row.is_admin),
+        is_active=bool(row.is_active),
+        role_ids=list(row.role_ids or []),
+        object_scopes=dict(row.object_scopes or {}),
+    )
+
+
 class IdentityStore:
     def __init__(self) -> None:
-        self.users: dict[str, User] = {}
-        self.roles: dict[str, Role] = {}
+        self._persist = persistence_enabled()
+        self.users: PersistMap[str, User] = PersistMap(
+            on_set=self._save_user if self._persist else None,
+            on_del=self._delete_user if self._persist else None,
+            on_clear=self._clear_users if self._persist else None,
+        )
+        self.roles: PersistMap[str, Role] = PersistMap(
+            on_set=self._save_role if self._persist else None,
+            on_del=self._delete_role if self._persist else None,
+            on_clear=self._clear_roles if self._persist else None,
+        )
         self.email_index: dict[str, str] = {}
-        self._seed()
+        if self._persist:
+            self._load()
+        if not self.roles:
+            self._seed()
+
+    def _load(self) -> None:
+        with db_session() as session:
+            roles = [_role_from_row(r) for r in session.scalars(select(RoleRow)).all()]
+            users = [_user_from_row(u) for u in session.scalars(select(UserRow)).all()]
+        self.roles.replace_all((r.id, r) for r in roles)
+        self.users.replace_all((u.id, u) for u in users)
+        self.email_index = {u.email: u.id for u in users}
+
+    def _save_role(self, role_id: str, role: Role) -> None:
+        with db_session() as session:
+            row = session.get(RoleRow, role_id) or RoleRow(id=role_id)
+            row.name = role.name
+            row.permissions = list(role.permissions)
+            session.merge(row)
+
+    def _delete_role(self, role_id: str) -> None:
+        with db_session() as session:
+            row = session.get(RoleRow, role_id)
+            if row:
+                session.delete(row)
+
+    def _clear_roles(self) -> None:
+        with db_session() as session:
+            session.execute(delete(RoleRow))
+
+    def _clear_users(self) -> None:
+        with db_session() as session:
+            session.execute(delete(UserRow))
+
+    def _save_user(self, user_id: str, user: User) -> None:
+        with db_session() as session:
+            row = session.get(UserRow, user_id) or UserRow(id=user_id)
+            row.email = user.email
+            row.password_hash = user.password_hash
+            row.is_admin = user.is_admin
+            row.is_active = user.is_active
+            row.role_ids = list(user.role_ids)
+            row.object_scopes = dict(user.object_scopes)
+            session.merge(row)
+
+    def _delete_user(self, user_id: str) -> None:
+        with db_session() as session:
+            row = session.get(UserRow, user_id)
+            if row:
+                session.delete(row)
 
     def _seed(self) -> None:
-        admin_role = Role(
-            id=new_id(),
-            name="admin",
-            permissions=["*"],
-        )
+        admin_role = Role(id=new_id(), name="admin", permissions=["*"])
         self.roles[admin_role.id] = admin_role
-        owner = Role(id=new_id(), name="owner", permissions=["*"])
-        florist = Role(
-            id=new_id(),
-            name="florist",
-            permissions=[
-                "catalog.read",
-                "catalog.write",
-                "assembly.write",
-                "inventory.read",
-                "inventory.write_off",
-            ],
-        )
-        cashier = Role(
-            id=new_id(),
-            name="cashier",
-            permissions=["sales.write", "sales.read", "cashier.write", "cashier.read", "catalog.read"],
-        )
-        analyst = Role(
-            id=new_id(),
-            name="analyst",
-            permissions=["analytics.read", "sales.read", "inventory.read", "cashier.read"],
-        )
-        for role in (owner, florist, cashier, analyst):
+        for role in (
+            Role(id=new_id(), name="owner", permissions=["*"]),
+            Role(
+                id=new_id(),
+                name="florist",
+                permissions=[
+                    "catalog.read",
+                    "catalog.write",
+                    "assembly.write",
+                    "inventory.read",
+                    "inventory.write_off",
+                ],
+            ),
+            Role(
+                id=new_id(),
+                name="cashier",
+                permissions=["sales.write", "sales.read", "cashier.write", "cashier.read", "catalog.read"],
+            ),
+            Role(
+                id=new_id(),
+                name="analyst",
+                permissions=["analytics.read", "sales.read", "inventory.read", "cashier.read"],
+            ),
+        ):
             self.roles[role.id] = role
 
     def bootstrap_admin(self, email: str, password: str) -> User:
-        if email in self.email_index:
-            return self.users[self.email_index[email]]
+        if email.lower() in self.email_index:
+            return self.users[self.email_index[email.lower()]]
         admin_role = next(r for r in self.roles.values() if r.name == "admin")
         user = User(
             id=new_id(),

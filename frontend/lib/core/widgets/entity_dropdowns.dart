@@ -7,6 +7,15 @@ import 'package:flowers/features/catalog/domain/entities/recipe.dart';
 import 'package:flowers/features/procurement/domain/entities/supplier.dart';
 import 'package:flowers/features/sales/domain/entities/sale_line.dart';
 
+Widget _menuText(String text) {
+  return Text(
+    text,
+    maxLines: 1,
+    softWrap: false,
+    overflow: TextOverflow.ellipsis,
+  );
+}
+
 class ProductDropdown extends StatelessWidget {
   const ProductDropdown({
     super.key,
@@ -37,15 +46,15 @@ class ProductDropdown extends StatelessWidget {
     }).toList();
 
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: items.any((p) => p.id == value) ? value : null,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final p in items)
           DropdownMenuItem(
             value: p.id,
-            child: Text(
+            child: _menuText(
               '${p.name} · ${Labels.productKind(p.kind)} · ${formatRub(p.sellPrice)}',
-              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],
@@ -84,13 +93,14 @@ class RecipeDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = recipes.where((r) => !r.archived).toList();
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: items.any((r) => r.id == value) ? value : null,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final r in items)
           DropdownMenuItem(
             value: r.id,
-            child: Text(_title(r), overflow: TextOverflow.ellipsis),
+            child: _menuText(_title(r)),
           ),
       ],
       onChanged: onChanged,
@@ -119,17 +129,17 @@ class SupplierDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: suppliers.any((s) => s.id == value) ? value : null,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final s in suppliers)
           DropdownMenuItem(
             value: s.id,
-            child: Text(
+            child: _menuText(
               s.phone == null || s.phone!.isEmpty
                   ? s.name
                   : '${s.name} · ${s.phone}',
-              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],
@@ -166,19 +176,19 @@ class ShiftDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = shifts.where((s) => !openOnly || s.isOpen).toList();
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: value == null || value!.isEmpty || items.any((s) => s.id == value)
           ? (value?.isEmpty == true ? null : value)
           : null,
       decoration: InputDecoration(labelText: label),
       items: [
         if (allowEmpty)
-          DropdownMenuItem(value: '', child: Text(emptyLabel)),
+          DropdownMenuItem(value: '', child: _menuText(emptyLabel)),
         for (final s in items)
           DropdownMenuItem(
             value: s.id,
-            child: Text(
+            child: _menuText(
               '${s.isOpen ? 'Открыта' : 'Закрыта'} · ${s.openedAt ?? '—'}',
-              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],
@@ -220,13 +230,14 @@ class SaleLineProductDropdown extends StatelessWidget {
     }
     final items = unique.values.toList();
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: items.any((l) => l.productId == value) ? value : null,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final line in items)
           DropdownMenuItem(
             value: line.productId,
-            child: Text(_title(line), overflow: TextOverflow.ellipsis),
+            child: _menuText(_title(line)),
           ),
       ],
       onChanged: onChanged,
@@ -257,15 +268,15 @@ class SupplyLineProductDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       value: productIds.contains(value) ? value : null,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final id in productIds)
           DropdownMenuItem(
             value: id,
-            child: Text(
+            child: _menuText(
               products.where((p) => p.id == id).firstOrNull?.name ?? 'Товар',
-              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],

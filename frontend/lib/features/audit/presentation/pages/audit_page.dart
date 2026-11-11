@@ -93,6 +93,7 @@ class _AuditViewState extends State<_AuditView> {
                           Expanded(
                             child: DropdownButtonFormField<String?>(
                               value: _eventName,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Событие',
                               ),
@@ -115,6 +116,7 @@ class _AuditViewState extends State<_AuditView> {
                           Expanded(
                             child: DropdownButtonFormField<String?>(
                               value: _actorFilter,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Исполнитель',
                               ),
@@ -142,6 +144,7 @@ class _AuditViewState extends State<_AuditView> {
                               value: entityTypes.contains(_entityType)
                                   ? _entityType
                                   : null,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Тип сущности',
                               ),
@@ -166,6 +169,7 @@ class _AuditViewState extends State<_AuditView> {
                               value: entityIds.contains(_entityId)
                                   ? _entityId
                                   : null,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Сущность',
                               ),

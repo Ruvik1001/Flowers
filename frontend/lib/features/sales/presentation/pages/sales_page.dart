@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
+import 'package:flowers/core/widgets/app_dialog.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -133,7 +134,7 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новая продажа'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -191,6 +192,7 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
                   ),
                   DropdownButtonFormField<String>(
                     value: method,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Оплата'),
                     items: const [
                       DropdownMenuItem(value: 'cash', child: Text('Наличные')),
@@ -296,7 +298,7 @@ Future<void> _showRefundDialog(BuildContext context, Sale sale) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Возврат'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -309,6 +311,7 @@ Future<void> _showRefundDialog(BuildContext context, Sale sale) async {
                   ),
                   DropdownButtonFormField<String>(
                     value: kind,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Тип'),
                     items: [
                       DropdownMenuItem(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
+import 'package:flowers/core/widgets/app_dialog.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
@@ -216,7 +217,7 @@ Future<void> _showCreateProductDialog(BuildContext context) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новый товар'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -227,6 +228,7 @@ Future<void> _showCreateProductDialog(BuildContext context) async {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     value: kind,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Тип'),
                     items: const [
                       DropdownMenuItem(value: 'flower', child: Text('Цветок')),
@@ -296,7 +298,7 @@ Future<void> _showCreateRecipeDialog(BuildContext context) async {
         builder: (ctx, setState) {
           return AlertDialog(
             title: const Text('Новый рецепт'),
-            content: SingleChildScrollView(
+            content: AppDialogScrollBody(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

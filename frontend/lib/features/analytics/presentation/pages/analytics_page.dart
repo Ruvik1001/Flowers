@@ -38,6 +38,7 @@ class _AnalyticsView extends StatelessWidget {
                 child: SoftCard(
                   child: DropdownButtonFormField<String>(
                     value: state.reportName,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Отчёт',
                     ),

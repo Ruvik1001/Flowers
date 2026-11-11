@@ -1,12 +1,15 @@
 import 'package:flowers/app/di.dart';
+import 'package:flowers/app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/l10n/labels.dart';
+import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
 import 'package:flowers/core/widgets/entity_list_tile.dart';
+import 'package:flowers/core/widgets/soft_card.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/procurement/domain/entities/supplier.dart';
 import 'package:flowers/features/procurement/domain/entities/supply.dart';
@@ -145,6 +148,7 @@ class _SuppliesTab extends StatefulWidget {
 
 class _SuppliesTabState extends State<_SuppliesTab> {
   Map<String, String> _productNames = {};
+  final Set<String> _expandedIds = {};
 
   @override
   void initState() {
@@ -162,11 +166,27 @@ class _SuppliesTabState extends State<_SuppliesTab> {
     } catch (_) {}
   }
 
+  void _toggleExpanded(String supplyId) {
+    setState(() {
+      if (_expandedIds.contains(supplyId)) {
+        _expandedIds.remove(supplyId);
+      } else {
+        _expandedIds.add(supplyId);
+      }
+    });
+  }
+
   String _supplierName(String id) =>
       widget.suppliers.where((s) => s.id == id).firstOrNull?.name ??
       'Поставщик';
 
-  String _productName(String id) => _productNames[id] ?? 'Товар';
+  String _productName(String id) {
+    final name = _productNames[id];
+    if (name != null && name.isNotEmpty) return name;
+    if (id.isEmpty) return 'Неизвестный товар';
+    if (id.length <= 8) return id;
+    return '${id.substring(0, 8)}…';
+  }
 
   String _formatDate(String? raw) {
     if (raw == null || raw.isEmpty) return Labels.orDash(null);
@@ -181,15 +201,27 @@ class _SuppliesTabState extends State<_SuppliesTab> {
     return '$dd.$mm.$yyyy $hh:$min';
   }
 
-  String _linesSummary(Supply supply) {
-    if (supply.lines.isEmpty) return 'Без позиций';
-    return supply.lines
-        .map((line) => '${_productName(line.productId)} × ${line.ordered}')
+  String _qtyLabel(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(2);
+  }
+
+  String _collapsedSummary(Supply supply) {
+    final count = supply.lines.length;
+    if (count == 0) return 'Без позиций';
+    final names = supply.lines
+        .take(2)
+        .map((line) => _productName(line.productId))
         .join(', ');
+    if (count <= 2) return '$count поз.: $names';
+    return '$count поз.: $names и ещё ${count - 2}';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (widget.supplies.isEmpty) {
       return const AsyncBody(
         loading: false,
@@ -204,15 +236,142 @@ class _SuppliesTabState extends State<_SuppliesTab> {
       itemCount: widget.supplies.length,
       itemBuilder: (context, index) {
         final supply = widget.supplies[index];
-        return EntityListTile(
-          title: Text(_supplierName(supply.supplierId)),
-          subtitle: Text(
-            '${_formatDate(supply.createdAt)}\n${_linesSummary(supply)}',
-          ),
-          trailing: IconButton(
-            icon: const Icon(Icons.check_circle_outline),
-            tooltip: 'Принять линию',
-            onPressed: () => _showAcceptDialog(context, supply),
+        final expanded = _expandedIds.contains(supply.id);
+        return SoftCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadii.sm),
+                      onTap: () => _toggleExpanded(supply.id),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AnimatedRotation(
+                              turns: expanded ? 0.5 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              child: const Icon(
+                                Icons.expand_more,
+                                color: AppColors.leaf,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _supplierName(supply.supplierId),
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _formatDate(supply.createdAt),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
+                                  if (!expanded) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _collapsedSummary(supply),
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.check_circle_outline),
+                    tooltip: 'Принять линию',
+                    onPressed: () => _showAcceptDialog(context, supply),
+                  ),
+                ],
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4, right: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Состав поставки',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: AppColors.leafDark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      if (supply.lines.isEmpty)
+                        Text(
+                          'Без позиций',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.muted,
+                          ),
+                        )
+                      else
+                        for (final line in supply.lines) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _productName(line.productId),
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${_qtyLabel(line.ordered)} шт · ${formatRub(line.unitCost)}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Text(
+                              'Принято: ${_qtyLabel(line.accepted)} из ${_qtyLabel(line.ordered)}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: line.accepted >= line.ordered
+                                    ? AppColors.success
+                                    : AppColors.muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                    ],
+                  ),
+                ),
+                crossFadeState: expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 220),
+              ),
+            ],
           ),
         );
       },

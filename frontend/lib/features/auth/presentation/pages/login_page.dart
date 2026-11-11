@@ -81,7 +81,8 @@ class _LoginPageState extends State<LoginPage> {
                         TextFormField(
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(labelText: 'Email'),
+                          decoration:
+                              const InputDecoration(labelText: 'Эл. почта'),
                           validator: (v) =>
                               (v == null || v.isEmpty) ? 'Обязательное поле' : null,
                         ),

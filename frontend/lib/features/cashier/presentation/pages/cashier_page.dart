@@ -1,9 +1,12 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:flowers/features/auth/presentation/cubit/auth_state.dart';
 import 'package:flowers/features/cashier/domain/entities/shift.dart';
 import 'package:flowers/features/cashier/presentation/cubit/cashier_cubit.dart';
 import 'package:flowers/features/cashier/presentation/cubit/cashier_state.dart';
@@ -40,13 +43,17 @@ class _CashierView extends StatelessWidget {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final shift = state.shifts[index];
+                final status = shift.isOpen ? 'Открыта' : 'Закрыта';
+                final discrepancy = shift.discrepancy != null
+                    ? ' · Δ ${formatRub(shift.discrepancy!)}'
+                    : '';
                 return ListTile(
-                  title: Text('Смена ${shift.id}'),
+                  title: Text(status),
                   subtitle: Text(
-                    'Кассир: ${shift.cashierId}\n'
-                    'Открытие: ${formatRub(shift.openingCash)} · '
-                    '${shift.isOpen ? 'открыта' : 'закрыта'}'
-                    '${shift.discrepancy != null ? ' · Δ ${formatRub(shift.discrepancy!)}' : ''}',
+                    'Открытие: ${formatRub(shift.openingCash)}'
+                    '${shift.expectedCash != null ? ' · Ожидается: ${formatRub(shift.expectedCash!)}' : ''}'
+                    '$discrepancy\n'
+                    '${Labels.orDash(shift.openedAt)}',
                   ),
                   isThreeLine: true,
                   trailing: shift.isOpen
@@ -85,7 +92,12 @@ class _CashierView extends StatelessWidget {
 }
 
 Future<void> _showOpenDialog(BuildContext context) async {
-  final cashierCtrl = TextEditingController();
+  final auth = context.read<AuthCubit>().state;
+  if (auth is! Authenticated) {
+    AppMessage.showError(context, 'Требуется авторизация');
+    return;
+  }
+  final user = auth.user;
   final cashCtrl = TextEditingController(text: '0');
   final cubit = context.read<CashierCubit>();
 
@@ -96,10 +108,11 @@ Future<void> _showOpenDialog(BuildContext context) async {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
-            controller: cashierCtrl,
-            decoration: const InputDecoration(labelText: 'ID кассира'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Кассир: ${user.email}'),
           ),
+          const SizedBox(height: 12),
           TextField(
             controller: cashCtrl,
             keyboardType:
@@ -123,7 +136,7 @@ Future<void> _showOpenDialog(BuildContext context) async {
   if (ok != true) return;
   try {
     await cubit.open(
-      cashierId: cashierCtrl.text.trim(),
+      cashierId: user.id,
       openingCash: double.tryParse(cashCtrl.text.replaceAll(',', '.')) ?? 0,
     );
     if (context.mounted) {

@@ -15,7 +15,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get loginTitle => 'Вход для сотрудников';
 
   @override
-  String get email => 'Email';
+  String get email => 'Эл. почта';
 
   @override
   String get password => 'Пароль';

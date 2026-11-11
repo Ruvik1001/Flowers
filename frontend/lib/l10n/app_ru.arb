@@ -2,7 +2,7 @@
   "@@locale": "ru",
   "appTitle": "Flowers",
   "loginTitle": "Вход для сотрудников",
-  "email": "Email",
+  "email": "Эл. почта",
   "password": "Пароль",
   "signIn": "Войти",
   "signOut": "Выйти",

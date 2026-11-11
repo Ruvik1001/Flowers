@@ -1,32 +1,43 @@
 import 'package:dio/dio.dart';
+import 'package:flowers/core/l10n/labels.dart';
 
 import '../errors/app_failure.dart';
 
 AppFailure mapDioError(Object error) {
-  if (error is AppFailure) return error;
+  if (error is AppFailure) {
+    return AppFailure(
+      code: error.code,
+      message: Labels.errorCode(error.code, error.message),
+      statusCode: error.statusCode,
+      details: error.details,
+    );
+  }
   if (error is! DioException) {
-    return AppFailure(message: error.toString());
+    return const AppFailure(message: 'Неизвестная ошибка');
   }
 
   final response = error.response;
   final data = response?.data;
 
-  if (data is Map<String, dynamic>) {
-    if (data['code'] is String) {
+  if (data is Map) {
+    final map = Map<String, dynamic>.from(data);
+    if (map['code'] is String) {
+      final code = map['code'] as String;
+      final raw = (map['message'] as String?) ?? 'Ошибка запроса';
       return AppFailure(
-        code: data['code'] as String,
-        message: (data['message'] as String?) ?? 'Ошибка запроса',
+        code: code,
+        message: Labels.errorCode(code, raw),
         statusCode: response?.statusCode,
-        details: data['details'] is Map<String, dynamic>
-            ? data['details'] as Map<String, dynamic>
+        details: map['details'] is Map
+            ? Map<String, dynamic>.from(map['details'] as Map)
             : null,
       );
     }
-    if (data['detail'] is List) {
-      final details = data['detail'] as List;
+    if (map['detail'] is List) {
+      final details = map['detail'] as List;
       final first = details.isNotEmpty ? details.first : null;
       final msg = first is Map && first['msg'] != null
-          ? first['msg'].toString()
+          ? 'Ошибка валидации'
           : 'Ошибка валидации';
       return AppFailure(
         code: 'validation_error',
@@ -34,10 +45,10 @@ AppFailure mapDioError(Object error) {
         statusCode: response?.statusCode ?? 422,
       );
     }
-    if (data['status'] == 'not_ready') {
+    if (map['status'] == 'not_ready') {
       return AppFailure(
         code: 'not_ready',
-        message: (data['detail'] as String?) ?? 'Сервис не готов',
+        message: Labels.errorCode('not_ready', 'Сервис не готов'),
         statusCode: response?.statusCode ?? 503,
       );
     }
@@ -56,7 +67,7 @@ AppFailure mapDioError(Object error) {
   }
 
   return AppFailure(
-    message: error.message ?? 'Сетевая ошибка',
+    message: Labels.errorCode(null, 'Сетевая ошибка'),
     statusCode: response?.statusCode,
   );
 }

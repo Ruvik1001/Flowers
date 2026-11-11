@@ -1,6 +1,7 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/features/analytics/data/analytics_repository.dart';
 import 'package:flowers/features/analytics/presentation/cubit/analytics_cubit.dart';
@@ -41,7 +42,7 @@ class _AnalyticsView extends StatelessWidget {
                       .map(
                         (name) => DropdownMenuItem(
                           value: name,
-                          child: Text(name),
+                          child: Text(Labels.report(name)),
                         ),
                       )
                       .toList(),
@@ -80,7 +81,25 @@ class _AnalyticsView extends StatelessWidget {
     );
   }
 
-  List<(String, String)> _flatten(Map<String, dynamic> data, [String prefix = '']) {
+  String _labelKey(String key) {
+    // Flattened keys may be "items[0].revenue" — label the leaf segment.
+    final leaf = key.contains('.')
+        ? key.split('.').last
+        : key.contains('[')
+            ? key.split('[').first
+            : key;
+    final leafClean = leaf.contains('[') ? leaf.split('[').first : leaf;
+    final labeled = Labels.reportKey(leafClean);
+    if (labeled != leafClean) {
+      return key.replaceAll(leafClean, labeled);
+    }
+    return Labels.reportKey(key);
+  }
+
+  List<(String, String)> _flatten(
+    Map<String, dynamic> data, [
+    String prefix = '',
+  ]) {
     final rows = <(String, String)>[];
     for (final entry in data.entries) {
       final key = prefix.isEmpty ? entry.key : '$prefix.${entry.key}';
@@ -91,13 +110,15 @@ class _AnalyticsView extends StatelessWidget {
         for (var i = 0; i < value.length; i++) {
           final item = value[i];
           if (item is Map) {
-            rows.addAll(_flatten(Map<String, dynamic>.from(item), '$key[$i]'));
+            rows.addAll(
+              _flatten(Map<String, dynamic>.from(item), '$key[$i]'),
+            );
           } else {
-            rows.add(('$key[$i]', item.toString()));
+            rows.add((_labelKey('$key[$i]'), Labels.orDash(item)));
           }
         }
       } else {
-        rows.add((key, value?.toString() ?? 'null'));
+        rows.add((_labelKey(key), Labels.orDash(value)));
       }
     }
     return rows;

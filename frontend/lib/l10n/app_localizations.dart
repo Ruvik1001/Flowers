@@ -113,7 +113,7 @@ abstract class AppLocalizations {
   /// No description provided for @email.
   ///
   /// In ru, this message translates to:
-  /// **'Email'**
+  /// **'Эл. почта'**
   String get email;
 
   /// No description provided for @password.

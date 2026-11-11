@@ -1,6 +1,7 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/features/admin/domain/entities/role.dart';
@@ -82,7 +83,7 @@ class _RoleTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(role.name),
-      subtitle: Text(role.permissions.join(', ')),
+      subtitle: Text(Labels.permissionsList(role.permissions)),
     );
   }
 }
@@ -109,7 +110,8 @@ Future<void> _showCreateUserDialog(
                 children: [
                   TextField(
                     controller: emailCtrl,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration:
+                        const InputDecoration(labelText: 'Эл. почта'),
                   ),
                   TextField(
                     controller: passwordCtrl,
@@ -175,49 +177,81 @@ Future<void> _showCreateUserDialog(
 
 Future<void> _showCreateRoleDialog(BuildContext context) async {
   final nameCtrl = TextEditingController();
-  final permsCtrl = TextEditingController();
+  final selected = <String>{};
   final cubit = context.read<AdminCubit>();
 
   final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Новая роль'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(labelText: 'Название'),
-          ),
-          TextField(
-            controller: permsCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Права (через запятую)',
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            title: const Text('Новая роль'),
+            content: SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration:
+                          const InputDecoration(labelText: 'Название'),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Права',
+                        style: Theme.of(ctx).textTheme.titleSmall,
+                      ),
+                    ),
+                    for (final code in Labels.knownPermissions)
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: selected.contains(code),
+                        title: Text(Labels.permission(code)),
+                        onChanged: (v) {
+                          setState(() {
+                            if (v == true) {
+                              selected.add(code);
+                            } else {
+                              selected.remove(code);
+                            }
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Отмена'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Создать'),
-        ),
-      ],
-    ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Создать'),
+              ),
+            ],
+          );
+        },
+      );
+    },
   );
   if (ok != true) return;
+  if (selected.isEmpty) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Выберите хотя бы одно право');
+    }
+    return;
+  }
   try {
     await cubit.createRole(
       name: nameCtrl.text.trim(),
-      permissions: permsCtrl.text
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList(),
+      permissions: selected.toList(),
     );
   } catch (_) {
     if (context.mounted) {

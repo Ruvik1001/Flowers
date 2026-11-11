@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/procurement/domain/entities/supplier.dart';
 import 'package:flowers/features/procurement/domain/entities/supply.dart';
 import 'package:flowers/features/procurement/domain/entities/supply_line.dart';
@@ -15,8 +17,7 @@ class ProcurementPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) =>
-          ProcurementCubit(Di.I.procurement)..load(),
+      create: (_) => ProcurementCubit(Di.I.procurement)..load(),
       child: const _ProcurementView(),
     );
   }
@@ -50,7 +51,10 @@ class _ProcurementView extends StatelessWidget {
               child: TabBarView(
                 children: [
                   _SuppliersTab(suppliers: state.suppliers),
-                  _SuppliesTab(supplies: state.supplies),
+                  _SuppliesTab(
+                    supplies: state.supplies,
+                    suppliers: state.suppliers,
+                  ),
                 ],
               ),
             );
@@ -107,9 +111,11 @@ class _SuppliersTab extends StatelessWidget {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final s = suppliers[index];
+        final phone =
+            s.phone?.isNotEmpty == true ? s.phone! : 'без телефона';
         return ListTile(
           title: Text(s.name),
-          subtitle: Text(s.phone?.isNotEmpty == true ? s.phone! : s.id),
+          subtitle: Text(phone),
         );
       },
     );
@@ -117,9 +123,16 @@ class _SuppliersTab extends StatelessWidget {
 }
 
 class _SuppliesTab extends StatelessWidget {
-  const _SuppliesTab({required this.supplies});
+  const _SuppliesTab({
+    required this.supplies,
+    required this.suppliers,
+  });
 
   final List<Supply> supplies;
+  final List<Supplier> suppliers;
+
+  String _supplierName(String id) =>
+      suppliers.where((s) => s.id == id).firstOrNull?.name ?? 'Поставщик';
 
   @override
   Widget build(BuildContext context) {
@@ -132,12 +145,8 @@ class _SuppliesTab extends StatelessWidget {
       itemBuilder: (context, index) {
         final supply = supplies[index];
         return ListTile(
-          title: Text('Поставка ${supply.id}'),
-          subtitle: Text(
-            'Поставщик: ${supply.supplierId}\n'
-            'Линий: ${supply.lines.length}',
-          ),
-          isThreeLine: true,
+          title: Text(_supplierName(supply.supplierId)),
+          subtitle: Text('Линий: ${supply.lines.length}'),
           trailing: IconButton(
             icon: const Icon(Icons.check_circle_outline),
             tooltip: 'Принять линию',
@@ -200,83 +209,100 @@ Future<void> _showCreateSupplierDialog(BuildContext context) async {
 }
 
 Future<void> _showCreateSupplyDialog(BuildContext context) async {
-  final supplierCtrl = TextEditingController();
-  final productCtrl = TextEditingController();
-  final qtyCtrl = TextEditingController(text: '1');
-  final costCtrl = TextEditingController(text: '0');
   final cubit = context.read<ProcurementCubit>();
   final suppliers = cubit.state.suppliers;
+  if (suppliers.isEmpty) {
+    AppMessage.showError(context, 'Сначала создайте поставщика');
+    return;
+  }
+
+  List<Product> products;
+  try {
+    products = await Di.I.catalog.listProducts();
+  } catch (_) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Не удалось загрузить товары');
+    }
+    return;
+  }
+  if (!context.mounted) return;
+
+  String? supplierId;
+  String? productId;
+  final qtyCtrl = TextEditingController(text: '1');
+  final costCtrl = TextEditingController(text: '0');
 
   final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Новая поставка'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (suppliers.isNotEmpty)
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Поставщик'),
-                items: suppliers
-                    .map(
-                      (s) => DropdownMenuItem(
-                        value: s.id,
-                        child: Text(s.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) supplierCtrl.text = v;
-                },
-              )
-            else
-              TextField(
-                controller: supplierCtrl,
-                decoration: const InputDecoration(labelText: 'ID поставщика'),
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            title: const Text('Новая поставка'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SupplierDropdown(
+                    suppliers: suppliers,
+                    value: supplierId,
+                    onChanged: (v) => setState(() => supplierId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  ProductDropdown(
+                    products: products,
+                    value: productId,
+                    onChanged: (v) => setState(() => productId = v),
+                  ),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Количество'),
+                  ),
+                  TextField(
+                    controller: costCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration:
+                        const InputDecoration(labelText: 'Себестоимость'),
+                  ),
+                ],
               ),
-            TextField(
-              controller: productCtrl,
-              decoration: const InputDecoration(labelText: 'ID товара'),
             ),
-            TextField(
-              controller: qtyCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Количество'),
-            ),
-            TextField(
-              controller: costCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Себестоимость'),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Отмена'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Создать'),
-        ),
-      ],
-    ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Создать'),
+              ),
+            ],
+          );
+        },
+      );
+    },
   );
   if (ok != true) return;
+  if (supplierId == null || productId == null) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Выберите поставщика и товар');
+    }
+    return;
+  }
+  final qty = double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 0;
   try {
     await cubit.createSupply(
-      supplierId: supplierCtrl.text.trim(),
+      supplierId: supplierId!,
       lines: [
         SupplyLine(
-          productId: productCtrl.text.trim(),
-          quantity:
-              double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 0,
-          ordered:
-              double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 0,
+          productId: productId!,
+          quantity: qty,
+          ordered: qty,
           unitCost:
               double.tryParse(costCtrl.text.replaceAll(',', '.')) ?? 0,
           accepted: 0,
@@ -294,67 +320,78 @@ Future<void> _showCreateSupplyDialog(BuildContext context) async {
 }
 
 Future<void> _showAcceptDialog(BuildContext context, Supply supply) async {
-  final productCtrl = TextEditingController(
-    text: supply.lines.isNotEmpty ? supply.lines.first.productId : '',
-  );
+  if (supply.lines.isEmpty) {
+    AppMessage.showError(context, 'Нет линий для приёмки');
+    return;
+  }
+
+  List<Product> products;
+  try {
+    products = await Di.I.catalog.listProducts(includeArchived: true);
+  } catch (_) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Не удалось загрузить товары');
+    }
+    return;
+  }
+  if (!context.mounted) return;
+
+  final productIds = supply.lines.map((l) => l.productId).toList();
+  String? productId = productIds.first;
   final qtyCtrl = TextEditingController(text: '1');
   final cubit = context.read<ProcurementCubit>();
 
   final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Принять линию'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (supply.lines.isNotEmpty)
-            DropdownButtonFormField<String>(
-              value: productCtrl.text.isEmpty ? null : productCtrl.text,
-              decoration: const InputDecoration(labelText: 'Товар'),
-              items: supply.lines
-                  .map(
-                    (l) => DropdownMenuItem(
-                      value: l.productId,
-                      child: Text(
-                        '${l.productId} (${l.accepted}/${l.ordered})',
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) productCtrl.text = v;
-              },
-            )
-          else
-            TextField(
-              controller: productCtrl,
-              decoration: const InputDecoration(labelText: 'ID товара'),
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            title: const Text('Принять линию'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SupplyLineProductDropdown(
+                  productIds: productIds,
+                  products: products,
+                  value: productId,
+                  onChanged: (v) => setState(() => productId = v),
+                ),
+                TextField(
+                  controller: qtyCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Количество'),
+                ),
+              ],
             ),
-          TextField(
-            controller: qtyCtrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Количество'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Отмена'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Принять'),
-        ),
-      ],
-    ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Принять'),
+              ),
+            ],
+          );
+        },
+      );
+    },
   );
   if (ok != true) return;
+  if (productId == null || productId!.isEmpty) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Выберите товар');
+    }
+    return;
+  }
   try {
     await cubit.acceptLine(
       supplyId: supply.id,
-      productId: productCtrl.text.trim(),
+      productId: productId!,
       quantity: double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 0,
     );
     if (context.mounted) {

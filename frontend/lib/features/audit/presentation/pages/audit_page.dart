@@ -1,9 +1,12 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/features/audit/presentation/cubit/audit_cubit.dart';
 import 'package:flowers/features/audit/presentation/cubit/audit_state.dart';
+import 'package:flowers/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:flowers/features/auth/presentation/cubit/auth_state.dart';
 
 class AuditPage extends StatelessWidget {
   const AuditPage({super.key});
@@ -25,26 +28,26 @@ class _AuditView extends StatefulWidget {
 }
 
 class _AuditViewState extends State<_AuditView> {
-  final _eventCtrl = TextEditingController();
-  final _actorCtrl = TextEditingController();
-  final _entityTypeCtrl = TextEditingController();
-  final _entityIdCtrl = TextEditingController();
+  /// null = Все, 'me' = Я
+  String? _actorFilter;
+  String? _eventName;
+  String? _entityId;
+  String? _entityType;
 
-  @override
-  void dispose() {
-    _eventCtrl.dispose();
-    _actorCtrl.dispose();
-    _entityTypeCtrl.dispose();
-    _entityIdCtrl.dispose();
-    super.dispose();
+  String? get _currentUserId {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is Authenticated) return auth.user.id;
+    return null;
   }
 
   void _applyFilters() {
+    final actorRaw = _actorFilter;
+    final actorId = actorRaw == 'me' ? _currentUserId : null;
     context.read<AuditCubit>().load(
-          eventName: _eventCtrl.text.trim(),
-          actorId: _actorCtrl.text.trim(),
-          entityType: _entityTypeCtrl.text.trim(),
-          entityId: _entityIdCtrl.text.trim(),
+          eventName: _eventName,
+          actorId: actorId,
+          entityType: _entityType,
+          entityId: _entityId,
         );
   }
 
@@ -64,48 +67,123 @@ class _AuditViewState extends State<_AuditView> {
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Row(
+            child: BlocBuilder<AuditCubit, AuditState>(
+              builder: (context, state) {
+                final entityIds = state.records
+                    .map((r) => r.entityId)
+                    .whereType<String>()
+                    .where((id) => id.isNotEmpty)
+                    .toSet()
+                    .toList()
+                  ..sort();
+                final entityTypes = state.records
+                    .map((r) => r.entityType)
+                    .whereType<String>()
+                    .where((t) => t.isNotEmpty)
+                    .toSet()
+                    .toList()
+                  ..sort();
+
+                return Column(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _eventCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Событие'),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            value: _eventName,
+                            decoration: const InputDecoration(
+                              labelText: 'Событие',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Все'),
+                              ),
+                              for (final name in Labels.knownAuditEvents)
+                                DropdownMenuItem<String?>(
+                                  value: name,
+                                  child: Text(Labels.auditEvent(name)),
+                                ),
+                            ],
+                            onChanged: (v) => setState(() => _eventName = v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            value: _actorFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'Исполнитель',
+                            ),
+                            items: const [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Все'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'me',
+                                child: Text('Я'),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _actorFilter = v),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _actorCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Actor ID'),
-                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            value: entityTypes.contains(_entityType)
+                                ? _entityType
+                                : null,
+                            decoration: const InputDecoration(
+                              labelText: 'Тип сущности',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Все'),
+                              ),
+                              for (final t in entityTypes)
+                                DropdownMenuItem<String?>(
+                                  value: t,
+                                  child: Text(Labels.entityType(t)),
+                                ),
+                            ],
+                            onChanged: (v) => setState(() => _entityType = v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            value: entityIds.contains(_entityId)
+                                ? _entityId
+                                : null,
+                            decoration: const InputDecoration(
+                              labelText: 'Сущность',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Все'),
+                              ),
+                              for (final id in entityIds)
+                                DropdownMenuItem<String?>(
+                                  value: id,
+                                  child: Text(id, overflow: TextOverflow.ellipsis),
+                                ),
+                            ],
+                            onChanged: (v) => setState(() => _entityId = v),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _entityTypeCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Тип сущности'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _entityIdCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'ID сущности'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                );
+              },
             ),
           ),
           Expanded(
@@ -122,12 +200,19 @@ class _AuditViewState extends State<_AuditView> {
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final record = state.records[index];
+                      final entity = [
+                        if (record.entityType != null &&
+                            record.entityType!.isNotEmpty)
+                          Labels.entityType(record.entityType!),
+                        if (record.entityId != null &&
+                            record.entityId!.isNotEmpty)
+                          record.entityId!,
+                      ].join(' ');
                       return ListTile(
-                        title: Text(record.eventName),
+                        title: Text(Labels.auditEvent(record.eventName)),
                         subtitle: Text(
                           '${record.occurredAt}\n'
-                          '${record.entityType ?? '—'} ${record.entityId ?? ''}'
-                          '${record.actorId != null ? ' · ${record.actorId}' : ''}',
+                          '${entity.isEmpty ? Labels.orDash(null) : entity}',
                         ),
                         isThreeLine: true,
                       );

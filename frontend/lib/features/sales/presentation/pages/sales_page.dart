@@ -1,9 +1,14 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/core/widgets/entity_dropdowns.dart';
+import 'package:flowers/core/widgets/photo_upload_field.dart';
+import 'package:flowers/features/cashier/domain/entities/shift.dart';
+import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/sales/domain/entities/payment.dart';
 import 'package:flowers/features/sales/domain/entities/sale.dart';
 import 'package:flowers/features/sales/domain/entities/sale_line.dart';
@@ -22,8 +27,39 @@ class SalesPage extends StatelessWidget {
   }
 }
 
-class _SalesView extends StatelessWidget {
+class _SalesView extends StatefulWidget {
   const _SalesView();
+
+  @override
+  State<_SalesView> createState() => _SalesViewState();
+}
+
+class _SalesViewState extends State<_SalesView> {
+  Map<String, String> _productNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final products = await Di.I.catalog.listProducts(includeArchived: true);
+      if (!mounted) return;
+      setState(() {
+        _productNames = {for (final p in products) p.id: p.name};
+      });
+    } catch (_) {}
+  }
+
+  String _lineSummary(Sale sale) {
+    if (sale.lines.isEmpty) return 'Без позиций';
+    return sale.lines.map((l) {
+      final name = _productNames[l.productId] ?? 'Товар';
+      return '$name × ${l.quantity}';
+    }).join(', ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +79,8 @@ class _SalesView extends StatelessWidget {
               itemBuilder: (context, index) {
                 final sale = state.sales[index];
                 return ListTile(
-                  title: Text('Продажа ${sale.id}'),
-                  subtitle: Text(
-                    '${formatRub(sale.total)} · линий: ${sale.lines.length}',
-                  ),
+                  title: Text(formatRub(sale.total)),
+                  subtitle: Text(_lineSummary(sale)),
                   trailing: IconButton(
                     icon: const Icon(Icons.undo),
                     tooltip: 'Возврат',
@@ -67,12 +101,25 @@ class _SalesView extends StatelessWidget {
 }
 
 Future<void> _showCreateSaleDialog(BuildContext context) async {
-  final productCtrl = TextEditingController();
+  List<Product> products;
+  List<Shift> shifts;
+  try {
+    products = await Di.I.catalog.listProducts();
+    shifts = await Di.I.cashier.listShifts();
+  } catch (_) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Не удалось загрузить данные');
+    }
+    return;
+  }
+  if (!context.mounted) return;
+
+  String? productId;
+  String shiftId = '';
   final qtyCtrl = TextEditingController(text: '1');
   final priceCtrl = TextEditingController();
   final amountCtrl = TextEditingController();
   var method = 'cash';
-  final shiftCtrl = TextEditingController();
   final cubit = context.read<SalesCubit>();
 
   final ok = await showDialog<bool>(
@@ -86,9 +133,26 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: productCtrl,
-                    decoration: const InputDecoration(labelText: 'ID товара'),
+                  ProductDropdown(
+                    products: products,
+                    value: productId,
+                    onChanged: (v) {
+                      setState(() {
+                        productId = v;
+                        final product =
+                            products.where((p) => p.id == v).firstOrNull;
+                        if (product != null && priceCtrl.text.isEmpty) {
+                          priceCtrl.text =
+                              product.sellPrice.toStringAsFixed(2);
+                          final q = double.tryParse(
+                                qtyCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              0;
+                          amountCtrl.text =
+                              (q * product.sellPrice).toStringAsFixed(2);
+                        }
+                      });
+                    },
                   ),
                   TextField(
                     controller: qtyCtrl,
@@ -96,6 +160,15 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
                       decimal: true,
                     ),
                     decoration: const InputDecoration(labelText: 'Количество'),
+                    onChanged: (v) {
+                      final q =
+                          double.tryParse(v.replaceAll(',', '.')) ?? 0;
+                      final p = double.tryParse(
+                            priceCtrl.text.replaceAll(',', '.'),
+                          ) ??
+                          0;
+                      amountCtrl.text = (q * p).toStringAsFixed(2);
+                    },
                   ),
                   TextField(
                     controller: priceCtrl,
@@ -104,9 +177,10 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
                     ),
                     decoration: const InputDecoration(labelText: 'Цена'),
                     onChanged: (v) {
-                      final q =
-                          double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ??
-                              0;
+                      final q = double.tryParse(
+                            qtyCtrl.text.replaceAll(',', '.'),
+                          ) ??
+                          0;
                       final p = double.tryParse(v.replaceAll(',', '.')) ?? 0;
                       amountCtrl.text = (q * p).toStringAsFixed(2);
                     },
@@ -129,13 +203,16 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(labelText: 'Сумма оплаты'),
+                    decoration:
+                        const InputDecoration(labelText: 'Сумма оплаты'),
                   ),
-                  TextField(
-                    controller: shiftCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'ID смены (опц.)',
-                    ),
+                  ShiftDropdown(
+                    shifts: shifts,
+                    value: shiftId,
+                    openOnly: true,
+                    allowEmpty: true,
+                    onChanged: (v) =>
+                        setState(() => shiftId = v ?? ''),
                   ),
                 ],
               ),
@@ -156,6 +233,12 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
     },
   );
   if (ok != true) return;
+  if (productId == null || productId!.isEmpty) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Выберите товар');
+    }
+    return;
+  }
 
   final qty = double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 0;
   final price = double.tryParse(priceCtrl.text.replaceAll(',', '.')) ?? 0;
@@ -166,13 +249,13 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
     await cubit.createSale(
       lines: [
         SaleLine(
-          productId: productCtrl.text.trim(),
+          productId: productId!,
           quantity: qty,
           unitPrice: price,
         ),
       ],
       payments: [Payment(method: method, amount: amount)],
-      shiftId: shiftCtrl.text.trim(),
+      shiftId: shiftId.isEmpty ? null : shiftId,
     );
     if (context.mounted) {
       AppMessage.showSuccess(context, 'Продажа создана');
@@ -185,13 +268,21 @@ Future<void> _showCreateSaleDialog(BuildContext context) async {
 }
 
 Future<void> _showRefundDialog(BuildContext context, Sale sale) async {
-  final amountCtrl = TextEditingController(text: sale.total.toStringAsFixed(2));
+  List<Product> products;
+  try {
+    products = await Di.I.catalog.listProducts(includeArchived: true);
+  } catch (_) {
+    products = const [];
+  }
+  if (!context.mounted) return;
+
+  final amountCtrl =
+      TextEditingController(text: sale.total.toStringAsFixed(2));
   var kind = 'money_only';
-  final productCtrl = TextEditingController(
-    text: sale.lines.isNotEmpty ? sale.lines.first.productId : '',
-  );
+  String? productId =
+      sale.lines.isNotEmpty ? sale.lines.first.productId : null;
   final qtyCtrl = TextEditingController(text: '1');
-  final photoCtrl = TextEditingController();
+  List<String> photoIds = [];
   final cubit = context.read<SalesCubit>();
 
   final ok = await showDialog<bool>(
@@ -215,26 +306,29 @@ Future<void> _showRefundDialog(BuildContext context, Sale sale) async {
                   DropdownButtonFormField<String>(
                     value: kind,
                     decoration: const InputDecoration(labelText: 'Тип'),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'money_only',
-                        child: Text('Только деньги'),
+                        child: Text(Labels.refundKind('money_only')),
                       ),
                       DropdownMenuItem(
                         value: 'stock_back',
-                        child: Text('На склад'),
+                        child: Text(Labels.refundKind('stock_back')),
                       ),
                       DropdownMenuItem(
                         value: 'defect_write_off',
-                        child: Text('Брак'),
+                        child: Text(Labels.refundKind('defect_write_off')),
                       ),
                     ],
                     onChanged: (v) => setState(() => kind = v ?? kind),
                   ),
-                  TextField(
-                    controller: productCtrl,
-                    decoration: const InputDecoration(labelText: 'ID товара'),
-                  ),
+                  if (sale.lines.isNotEmpty)
+                    SaleLineProductDropdown(
+                      lines: sale.lines,
+                      products: products,
+                      value: productId,
+                      onChanged: (v) => setState(() => productId = v),
+                    ),
                   TextField(
                     controller: qtyCtrl,
                     keyboardType: const TextInputType.numberWithOptions(
@@ -242,12 +336,14 @@ Future<void> _showRefundDialog(BuildContext context, Sale sale) async {
                     ),
                     decoration: const InputDecoration(labelText: 'Количество'),
                   ),
-                  TextField(
-                    controller: photoCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'ID фото (через запятую)',
+                  if (kind == 'defect_write_off') ...[
+                    const SizedBox(height: 8),
+                    PhotoUploadField(
+                      fileIds: photoIds,
+                      onChanged: (ids) => setState(() => photoIds = ids),
+                      minCount: 1,
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -268,18 +364,21 @@ Future<void> _showRefundDialog(BuildContext context, Sale sale) async {
   );
   if (ok != true) return;
 
+  if (kind == 'defect_write_off' && photoIds.isEmpty) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Нужно приложить хотя бы 1 фото');
+    }
+    return;
+  }
+
   try {
     await cubit.createRefund(
       saleId: sale.id,
       amount: double.tryParse(amountCtrl.text.replaceAll(',', '.')) ?? 0,
       kind: kind,
-      productId: productCtrl.text.trim(),
+      productId: productId,
       quantity: double.tryParse(qtyCtrl.text.replaceAll(',', '.')),
-      photoIds: photoCtrl.text
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList(),
+      photoIds: photoIds,
     );
     if (context.mounted) {
       AppMessage.showSuccess(context, 'Возврат оформлен');

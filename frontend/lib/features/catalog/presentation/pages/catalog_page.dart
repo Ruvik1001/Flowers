@@ -1,9 +1,11 @@
 import 'package:flowers/app/di.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flowers/core/l10n/labels.dart';
 import 'package:flowers/core/network/money.dart';
 import 'package:flowers/core/widgets/app_message.dart';
 import 'package:flowers/core/widgets/async_body.dart';
+import 'package:flowers/core/widgets/entity_dropdowns.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/catalog/domain/entities/recipe.dart';
 import 'package:flowers/features/catalog/domain/entities/recipe_item.dart';
@@ -50,7 +52,10 @@ class _CatalogView extends StatelessWidget {
               child: TabBarView(
                 children: [
                   _ProductsTab(products: state.products),
-                  _RecipesTab(recipes: state.recipes),
+                  _RecipesTab(
+                    recipes: state.recipes,
+                    products: state.products,
+                  ),
                 ],
               ),
             );
@@ -114,7 +119,9 @@ class _ProductsTab extends StatelessWidget {
         final product = products[index];
         return ListTile(
           title: Text(product.name),
-          subtitle: Text('${product.kind} · ${formatRub(product.sellPrice)}'),
+          subtitle: Text(
+            '${Labels.productKind(product.kind)} · ${formatRub(product.sellPrice)}',
+          ),
           trailing: product.archived
               ? const Chip(label: Text('Архив'))
               : IconButton(
@@ -142,9 +149,13 @@ class _ProductsTab extends StatelessWidget {
 }
 
 class _RecipesTab extends StatelessWidget {
-  const _RecipesTab({required this.recipes});
+  const _RecipesTab({required this.recipes, required this.products});
 
   final List<Recipe> recipes;
+  final List<Product> products;
+
+  String _bouquetName(String id) =>
+      products.where((p) => p.id == id).firstOrNull?.name ?? 'Букет';
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +173,7 @@ class _RecipesTab extends StatelessWidget {
       itemBuilder: (context, index) {
         final recipe = recipes[index];
         return ListTile(
-          title: Text('Букет ${recipe.bouquetId}'),
+          title: Text(_bouquetName(recipe.bouquetId)),
           subtitle: Text('Позиций: ${recipe.items.length}'),
           trailing: recipe.archived
               ? const Chip(label: Text('Архив'))
@@ -270,64 +281,76 @@ Future<void> _showCreateProductDialog(BuildContext context) async {
 }
 
 Future<void> _showCreateRecipeDialog(BuildContext context) async {
-  final bouquetCtrl = TextEditingController();
-  final productCtrl = TextEditingController();
-  final qtyCtrl = TextEditingController(text: '1');
   final cubit = context.read<CatalogCubit>();
+  final products = cubit.state.products;
+  String? bouquetId;
+  String? componentId;
+  final qtyCtrl = TextEditingController(text: '1');
 
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Новый рецепт'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: bouquetCtrl,
-                decoration: const InputDecoration(labelText: 'ID букета'),
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            title: const Text('Новый рецепт'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ProductDropdown(
+                    products: products,
+                    value: bouquetId,
+                    kinds: const {'bouquet'},
+                    label: 'Букет',
+                    onChanged: (v) => setState(() => bouquetId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  ProductDropdown(
+                    products: products,
+                    value: componentId,
+                    excludeKinds: const {'bouquet'},
+                    label: 'Компонент',
+                    onChanged: (v) => setState(() => componentId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Количество'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: productCtrl,
-                decoration: const InputDecoration(labelText: 'ID компонента'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Отмена'),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: qtyCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Количество'),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Создать'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Создать'),
-          ),
-        ],
+          );
+        },
       );
     },
   );
 
   if (ok != true) return;
+  if (bouquetId == null || componentId == null) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Выберите букет и компонент');
+    }
+    return;
+  }
   final qty = double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 0;
   try {
     await cubit.createRecipe(
-      bouquetId: bouquetCtrl.text.trim(),
-      items: [
-        RecipeItem(
-          productId: productCtrl.text.trim(),
-          quantity: qty,
-        ),
-      ],
+      bouquetId: bouquetId!,
+      items: [RecipeItem(productId: componentId!, quantity: qty)],
     );
     if (context.mounted) {
       AppMessage.showSuccess(context, 'Рецепт создан');

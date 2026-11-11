@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import delete, select
@@ -10,6 +11,15 @@ from shared.persistence.models import SupplierRow, SupplyRow
 from shared.persistence.persist_map import PersistMap
 from shared.persistence.runtime import db_session, persistence_enabled
 from shared.utils import Money
+
+
+def _parse_dt(value: str | None) -> datetime:
+    if not value:
+        return datetime.now(UTC)
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 def _supplier_payload(item: Supplier) -> dict:
@@ -28,6 +38,7 @@ def _supplier_from_row(row: SupplierRow) -> Supplier:
 
 def _supply_payload(item: Supply) -> dict:
     return {
+        "created_at": item.created_at.isoformat(),
         "lines": [
             {
                 "product_id": line.product_id,
@@ -36,7 +47,7 @@ def _supply_payload(item: Supply) -> dict:
                 "accepted": str(line.accepted),
             }
             for line in item.lines
-        ]
+        ],
     }
 
 
@@ -51,7 +62,12 @@ def _supply_from_row(row: SupplyRow) -> Supply:
         )
         for raw in payload.get("lines", [])
     ]
-    return Supply(supplier_id=row.supplier_id, lines=lines, id=row.id)
+    return Supply(
+        supplier_id=row.supplier_id,
+        lines=lines,
+        id=row.id,
+        created_at=_parse_dt(payload.get("created_at")),
+    )
 
 
 class ProcurementStore:

@@ -1,0 +1,11 @@
+services:
+  postgres:
+    ports: ["5432:5432"]
+  redis:
+    ports: ["6379:6379"]
+  gateway:
+    environment:
+      RATE_LIMIT_PER_MINUTE: 0
+  files:
+    volumes:
+      - ./uploads:/data/uploads

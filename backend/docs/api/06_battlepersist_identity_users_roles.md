@@ -2,7 +2,7 @@
 
 Short description: Create staff users, list roles, create custom roles.
 
-> There is **no** `GET /users` or user-update route yet; user creation is the only users endpoint. Users and roles are persisted in Postgres (`identity.users`, `identity.roles`) and survive restarts.
+> `GET /users` is documented in `25_d71a108_identity_users_list.md`. There is still no user-update route. Users and roles are persisted in Postgres (`identity.users`, `identity.roles`) and survive restarts.
 
 All routes require `Authorization: Bearer <access_token>`. Common error rows (not repeated per endpoint): `401 missing_token`, `401 invalid_token`, `401 invalid_token_type`, `429 rate_limited`, `502 upstream_unavailable`, `500 internal_error` (see `22_battlepersist_common_errors.md`).
 

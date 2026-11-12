@@ -48,6 +48,9 @@ Gateway base URL (local): `http://localhost:8080`. A ready-made Postman collecti
 | 20 | [20_battlepersist_analytics_reports.md](20_battlepersist_analytics_reports.md) | analytics | `GET /api/v1/analytics/reports/{name}` | Bearer |
 | 21 | [21_battlepersist_audit_list.md](21_battlepersist_audit_list.md) | audit | `GET /api/v1/audit/audit` | Bearer |
 | 22 | [22_battlepersist_common_errors.md](22_battlepersist_common_errors.md) | all | Conventions, auth, error envelope | – |
+| 23 | [23_d71a108_cashier_movements.md](23_d71a108_cashier_movements.md) | cashier | `POST /api/v1/cashier/shifts/{id}/movements` | Bearer |
+| 24 | [24_d71a108_catalog_categories_patch_unarchive.md](24_d71a108_catalog_categories_patch_unarchive.md) | catalog | categories CRUD, `PATCH /products/{id}`, product/recipe unarchive | Bearer |
+| 25 | [25_d71a108_identity_users_list.md](25_d71a108_identity_users_list.md) | identity | `GET /api/v1/identity/users` | Bearer (admin / users.write) |
 
 ## Not part of the FE contract
 

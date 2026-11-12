@@ -2,7 +2,7 @@
 
 Short description: List, create and archive sellable products (flowers, materials, bouquets).
 
-Products are persisted in Postgres (`catalog.products`). There is no hard delete; "delete" is `archive`. There is no update/get-by-id route.
+Products are persisted in Postgres (`catalog.products`). There is no hard delete; "delete" is `archive`. `PATCH` update and unarchive are in `24_d71a108_catalog_categories_patch_unarchive.md`. Responses include nullable `category_id`.
 
 All routes need `Authorization: Bearer <access_token>`. Gateway-level errors (`401 missing_token|invalid_token|invalid_token_type`, `429 rate_limited`, `502 upstream_unavailable`, `500 internal_error`) apply to every endpoint – see `22_battlepersist_common_errors.md`. Downstream services do not check permissions: any valid access token works.
 

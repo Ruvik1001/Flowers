@@ -6,7 +6,8 @@ Shifts are persisted in Postgres (`cashier.shifts`). Closing publishes `ShiftClo
 
 > Response quirk: `list`, `open` and `cash` return the raw shift object, where money fields are objects `{ "amount": <number> }` (`opening_cash`, `cash_sales`, `cash_refunds`, `actual_cash`) and `opened_at`/`closed_at` are ISO-8601 UTC strings. `close` returns a flattened object with plain numbers.
 
-Formula: `expected_cash = opening_cash + cash_sales − cash_refunds`; `discrepancy = actual_cash − expected_cash`.
+Formula: `expected_cash = opening_cash + cash_sales + cash_in − cash_refunds − cash_out`; `discrepancy = actual_cash − expected_cash`.  
+Deposit/collection movements: see `23_d71a108_cashier_movements.md` (do not use `/cash` for внос/самоинкассация). Shift objects also expose `cash_in` / `cash_out`.
 
 Gateway path: `/api/v1/cashier/shifts...`
 

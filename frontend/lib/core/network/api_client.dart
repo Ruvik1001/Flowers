@@ -101,6 +101,19 @@ class ApiClient {
     }
   }
 
+  Future<T> patch<T>(
+    String path, {
+    Object? data,
+    T Function(dynamic data)? parse,
+  }) async {
+    try {
+      final res = await dio.patch<dynamic>(path, data: data);
+      return parse != null ? parse(res.data) : res.data as T;
+    } catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
   Future<Response<dynamic>> postMultipart(
     String path, {
     required FormData formData,

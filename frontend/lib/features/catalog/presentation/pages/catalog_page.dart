@@ -9,12 +9,13 @@ import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_dropdowns.dart';
 import 'package:flowers/core/widgets/entity_list_tile.dart';
-import 'package:flowers/core/widgets/status_chip.dart';
+import 'package:flowers/features/catalog/domain/entities/category.dart';
 import 'package:flowers/features/catalog/domain/entities/product.dart';
 import 'package:flowers/features/catalog/domain/entities/recipe.dart';
 import 'package:flowers/features/catalog/domain/entities/recipe_item.dart';
 import 'package:flowers/features/catalog/presentation/cubit/catalog_cubit.dart';
 import 'package:flowers/features/catalog/presentation/cubit/catalog_state.dart';
+import 'package:flowers/features/catalog/presentation/pages/product_editor_page.dart';
 
 class CatalogPage extends StatelessWidget {
   const CatalogPage({super.key});
@@ -28,18 +29,97 @@ class CatalogPage extends StatelessWidget {
   }
 }
 
-class _CatalogView extends StatelessWidget {
+class _CatalogView extends StatefulWidget {
   const _CatalogView();
+
+  @override
+  State<_CatalogView> createState() => _CatalogViewState();
+}
+
+class _CatalogViewState extends State<_CatalogView> {
+  String? _kindFilter;
+  String? _categoryFilter;
+
+  Future<void> _openProductEditor({Product? product}) async {
+    final cubit = context.read<CatalogCubit>();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: ProductEditorPage(
+            product: product,
+            categories: cubit.state.categories,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createCategory() async {
+    final nameCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Новая категория'),
+        content: AppDialogScrollBody(
+          child: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'Название'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final cubit = context.read<CatalogCubit>();
+    try {
+      await cubit.createCategory(name: nameCtrl.text.trim());
+      if (mounted) AppMessage.showSuccess(context, 'Категория создана');
+    } catch (_) {
+      if (mounted) {
+        AppMessage.showError(context, cubit.state.error ?? 'Ошибка');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: AppPageScaffold(
         title: const Text('Каталог'),
+        actions: [
+          BlocBuilder<CatalogCubit, CatalogState>(
+            builder: (context, state) {
+              return IconButton(
+                tooltip: state.includeArchived
+                    ? 'Скрыть архив'
+                    : 'Показать архив',
+                onPressed: () => context
+                    .read<CatalogCubit>()
+                    .load(includeArchived: !state.includeArchived),
+                icon: Icon(
+                  state.includeArchived
+                      ? Icons.unarchive_outlined
+                      : Icons.inventory_2_outlined,
+                ),
+              );
+            },
+          ),
+        ],
         bottom: const TabBar(
           tabs: [
             Tab(text: 'Товары'),
+            Tab(text: 'Категории'),
             Tab(text: 'Рецепты'),
           ],
         ),
@@ -58,6 +138,11 @@ class _CatalogView extends StatelessWidget {
                       onTap: () => Navigator.pop(ctx, 'product'),
                     ),
                     ListTile(
+                      leading: const Icon(Icons.category_outlined),
+                      title: const Text('Категория'),
+                      onTap: () => Navigator.pop(ctx, 'category'),
+                    ),
+                    ListTile(
                       leading: const Icon(Icons.menu_book),
                       title: const Text('Рецепт'),
                       onTap: () => Navigator.pop(ctx, 'recipe'),
@@ -66,9 +151,11 @@ class _CatalogView extends StatelessWidget {
                 ),
               ),
             );
-            if (!context.mounted || choice == null) return;
+            if (!mounted || choice == null) return;
             if (choice == 'product') {
-              await _showCreateProductDialog(context);
+              await _openProductEditor();
+            } else if (choice == 'category') {
+              await _createCategory();
             } else {
               await _showCreateRecipeDialog(context);
             }
@@ -77,15 +164,32 @@ class _CatalogView extends StatelessWidget {
         ),
         body: BlocBuilder<CatalogCubit, CatalogState>(
           builder: (context, state) {
+            final products = state.products.where((p) {
+              if (_kindFilter != null && p.kind != _kindFilter) return false;
+              if (_categoryFilter != null && p.categoryId != _categoryFilter) {
+                return false;
+              }
+              return true;
+            }).toList();
             return AsyncBody(
               loading: state.loading &&
                   state.products.isEmpty &&
-                  state.recipes.isEmpty,
+                  state.categories.isEmpty,
               error: state.error,
               onRetry: () => context.read<CatalogCubit>().load(),
               child: TabBarView(
                 children: [
-                  _ProductsTab(products: state.products),
+                  _ProductsTab(
+                    products: products,
+                    categories: state.categories,
+                    kindFilter: _kindFilter,
+                    categoryFilter: _categoryFilter,
+                    onKindFilter: (v) => setState(() => _kindFilter = v),
+                    onCategoryFilter: (v) =>
+                        setState(() => _categoryFilter = v),
+                    onEdit: (p) => _openProductEditor(product: p),
+                  ),
+                  _CategoriesTab(categories: state.categories),
                   _RecipesTab(
                     recipes: state.recipes,
                     products: state.products,
@@ -101,46 +205,202 @@ class _CatalogView extends StatelessWidget {
 }
 
 class _ProductsTab extends StatelessWidget {
-  const _ProductsTab({required this.products});
+  const _ProductsTab({
+    required this.products,
+    required this.categories,
+    required this.kindFilter,
+    required this.categoryFilter,
+    required this.onKindFilter,
+    required this.onCategoryFilter,
+    required this.onEdit,
+  });
 
   final List<Product> products;
+  final List<Category> categories;
+  final String? kindFilter;
+  final String? categoryFilter;
+  final ValueChanged<String?> onKindFilter;
+  final ValueChanged<String?> onCategoryFilter;
+  final ValueChanged<Product> onEdit;
+
+  String _categoryName(String? id) {
+    if (id == null || id.isEmpty) return 'Без категории';
+    return categories.where((c) => c.id == id).firstOrNull?.name ?? 'Категория';
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (products.isEmpty) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String?>(
+                  value: kindFilter,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Тип'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Все')),
+                    for (final k in const ['flower', 'material', 'bouquet'])
+                      DropdownMenuItem(
+                        value: k,
+                        child: Text(Labels.productKind(k)),
+                      ),
+                  ],
+                  onChanged: onKindFilter,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<String?>(
+                  value: categoryFilter,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Категория'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Все')),
+                    for (final c in categories.where((c) => !c.archived))
+                      DropdownMenuItem(value: c.id, child: Text(c.name)),
+                  ],
+                  onChanged: onCategoryFilter,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: products.isEmpty
+              ? const AsyncBody(
+                  loading: false,
+                  isEmpty: true,
+                  emptyMessage: 'Нет товаров',
+                  child: SizedBox.shrink(),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.only(top: 8, bottom: 88),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    return EntityListTile(
+                      title: Text(product.name),
+                      subtitle: Text(
+                        '${Labels.productKind(product.kind)} · '
+                        '${_categoryName(product.categoryId)} · '
+                        '${formatRub(product.sellPrice)}',
+                      ),
+                      onTap: product.archived
+                          ? null
+                          : () => onEdit(product),
+                      trailing: product.archived
+                          ? TextButton(
+                              onPressed: () async {
+                                final cubit = context.read<CatalogCubit>();
+                                try {
+                                  await cubit.unarchiveProduct(product.id);
+                                  if (context.mounted) {
+                                    AppMessage.showSuccess(
+                                      context,
+                                      'Товар восстановлен',
+                                    );
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    AppMessage.showError(
+                                      context,
+                                      cubit.state.error ?? 'Ошибка',
+                                    );
+                                  }
+                                }
+                              },
+                              child: const Text('Восстановить'),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.archive_outlined),
+                              tooltip: 'В архив',
+                              onPressed: () async {
+                                final cubit = context.read<CatalogCubit>();
+                                try {
+                                  await cubit.archiveProduct(product.id);
+                                  if (context.mounted) {
+                                    AppMessage.showSuccess(
+                                      context,
+                                      'Товар в архиве',
+                                    );
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    AppMessage.showError(
+                                      context,
+                                      'Не удалось архивировать',
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoriesTab extends StatelessWidget {
+  const _CategoriesTab({required this.categories});
+
+  final List<Category> categories;
+
+  @override
+  Widget build(BuildContext context) {
+    if (categories.isEmpty) {
       return const AsyncBody(
         loading: false,
         isEmpty: true,
-        emptyMessage: 'Нет товаров',
+        emptyMessage: 'Нет категорий',
         child: SizedBox.shrink(),
       );
     }
     return ListView.builder(
       padding: const EdgeInsets.only(top: 8, bottom: 88),
-      itemCount: products.length,
+      itemCount: categories.length,
       itemBuilder: (context, index) {
-        final product = products[index];
+        final category = categories[index];
         return EntityListTile(
-          title: Text(product.name),
-          subtitle: Text(
-            '${Labels.productKind(product.kind)} · ${formatRub(product.sellPrice)}',
-          ),
-          trailing: product.archived
-              ? const StatusChip(label: 'Архив', tone: StatusTone.neutral)
-              : IconButton(
-                  icon: const Icon(Icons.archive_outlined),
-                  tooltip: 'В архив',
+          title: Text(category.name),
+          trailing: category.archived
+              ? TextButton(
                   onPressed: () async {
+                    final cubit = context.read<CatalogCubit>();
                     try {
-                      await context
-                          .read<CatalogCubit>()
-                          .archiveProduct(product.id);
+                      await cubit.unarchiveCategory(category.id);
                       if (context.mounted) {
-                        AppMessage.showSuccess(context, 'Товар в архиве');
+                        AppMessage.showSuccess(context, 'Категория восстановлена');
                       }
                     } catch (_) {
                       if (context.mounted) {
-                        AppMessage.showError(context, 'Не удалось архивировать');
+                        AppMessage.showError(
+                          context,
+                          cubit.state.error ?? 'Ошибка',
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Восстановить'),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.archive_outlined),
+                  onPressed: () async {
+                    final cubit = context.read<CatalogCubit>();
+                    try {
+                      await cubit.archiveCategory(category.id);
+                      if (context.mounted) {
+                        AppMessage.showSuccess(context, 'В архиве');
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        AppMessage.showError(context, 'Ошибка');
                       }
                     }
                   },
@@ -175,25 +435,44 @@ class _RecipesTab extends StatelessWidget {
       itemCount: recipes.length,
       itemBuilder: (context, index) {
         final recipe = recipes[index];
+        final comps = recipe.items.map((i) {
+          final name =
+              products.where((p) => p.id == i.productId).firstOrNull?.name ??
+                  'Товар';
+          return '$name × ${i.quantity}';
+        }).join(', ');
         return EntityListTile(
           title: Text(_bouquetName(recipe.bouquetId)),
-          subtitle: Text('Позиций: ${recipe.items.length}'),
+          subtitle: Text(comps.isEmpty ? 'Без состава' : comps),
           trailing: recipe.archived
-              ? const StatusChip(label: 'Архив', tone: StatusTone.neutral)
+              ? TextButton(
+                  onPressed: () async {
+                    final cubit = context.read<CatalogCubit>();
+                    try {
+                      await cubit.unarchiveRecipe(recipe.id);
+                      if (context.mounted) {
+                        AppMessage.showSuccess(context, 'Рецепт восстановлен');
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        AppMessage.showError(context, 'Ошибка');
+                      }
+                    }
+                  },
+                  child: const Text('Восстановить'),
+                )
               : IconButton(
                   icon: const Icon(Icons.archive_outlined),
-                  tooltip: 'В архив',
                   onPressed: () async {
+                    final cubit = context.read<CatalogCubit>();
                     try {
-                      await context
-                          .read<CatalogCubit>()
-                          .archiveRecipe(recipe.id);
+                      await cubit.archiveRecipe(recipe.id);
                       if (context.mounted) {
                         AppMessage.showSuccess(context, 'Рецепт в архиве');
                       }
                     } catch (_) {
                       if (context.mounted) {
-                        AppMessage.showError(context, 'Не удалось архивировать');
+                        AppMessage.showError(context, 'Ошибка');
                       }
                     }
                   },
@@ -204,89 +483,9 @@ class _RecipesTab extends StatelessWidget {
   }
 }
 
-Future<void> _showCreateProductDialog(BuildContext context) async {
-  final nameCtrl = TextEditingController();
-  final priceCtrl = TextEditingController();
-  var kind = 'flower';
-  final cubit = context.read<CatalogCubit>();
-
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (ctx, setState) {
-          return AlertDialog(
-            title: const Text('Новый товар'),
-            content: AppDialogScrollBody(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Название'),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: kind,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Тип'),
-                    items: const [
-                      DropdownMenuItem(value: 'flower', child: Text('Цветок')),
-                      DropdownMenuItem(
-                        value: 'material',
-                        child: Text('Материал'),
-                      ),
-                      DropdownMenuItem(value: 'bouquet', child: Text('Букет')),
-                    ],
-                    onChanged: (v) => setState(() => kind = v ?? kind),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: priceCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Цена'),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Создать'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-
-  if (ok != true) return;
-  final price = double.tryParse(priceCtrl.text.replaceAll(',', '.')) ?? 0;
-  try {
-    await cubit.createProduct(
-      name: nameCtrl.text.trim(),
-      kind: kind,
-      sellPrice: price,
-    );
-    if (context.mounted) {
-      AppMessage.showSuccess(context, 'Товар создан');
-    }
-  } catch (_) {
-    if (context.mounted) {
-      AppMessage.showError(context, 'Ошибка создания товара');
-    }
-  }
-}
-
 Future<void> _showCreateRecipeDialog(BuildContext context) async {
   final cubit = context.read<CatalogCubit>();
-  final products = cubit.state.products;
+  final products = cubit.state.products.where((p) => !p.archived).toList();
   String? bouquetId;
   String? componentId;
   final qtyCtrl = TextEditingController(text: '1');
@@ -361,7 +560,7 @@ Future<void> _showCreateRecipeDialog(BuildContext context) async {
     }
   } catch (_) {
     if (context.mounted) {
-      AppMessage.showError(context, 'Ошибка создания рецепта');
+      AppMessage.showError(context, cubit.state.error ?? 'Ошибка создания рецепта');
     }
   }
 }

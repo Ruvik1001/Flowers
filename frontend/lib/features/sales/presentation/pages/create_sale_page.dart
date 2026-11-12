@@ -165,14 +165,14 @@ class _CreateSalePageState extends State<CreateSalePage> {
                 SoftCard(
                   child: _shift != null
                       ? Text(
-                          'Смена открыта · наличные ${formatRub(_shift!.openingCash + _shift!.cashSales - _shift!.cashRefunds)}',
+                          'Смена открыта · в кассе ${formatRub(_shift!.inDrawer)}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              'Нет открытой смены',
+                              'Смена не открыта',
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium
@@ -180,7 +180,8 @@ class _CreateSalePageState extends State<CreateSalePage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'При продаже за наличные смена откроется автоматически.',
+                              'Для наличных откройте смену на вкладке Касса. '
+                              'Ниже — запасной вариант открыть прямо из чека.',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -194,7 +195,7 @@ class _CreateSalePageState extends State<CreateSalePage> {
                                 decimal: true,
                               ),
                               decoration: const InputDecoration(
-                                labelText: 'Наличные в кассе при открытии',
+                                labelText: 'Наличные при открытии (если нужно)',
                               ),
                             ),
                           ],

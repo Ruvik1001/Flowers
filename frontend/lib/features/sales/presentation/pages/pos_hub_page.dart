@@ -45,6 +45,7 @@ class _PosHubView extends StatefulWidget {
 
 class _PosHubViewState extends State<_PosHubView> {
   Map<String, String> _productNames = {};
+  Shift? _lastClosed;
 
   @override
   void initState() {
@@ -65,6 +66,12 @@ class _PosHubViewState extends State<_PosHubView> {
   Shift? _openShift(CashierState state) =>
       state.shifts.where((s) => s.isOpen).firstOrNull;
 
+  List<Shift> _closedShifts(CashierState state) {
+    final closed = state.shifts.where((s) => !s.isOpen).toList();
+    closed.sort((a, b) => (b.closedAt ?? '').compareTo(a.closedAt ?? ''));
+    return closed.take(8).toList();
+  }
+
   String _lineSummary(Sale sale) {
     if (sale.lines.isEmpty) return 'Без позиций';
     return sale.lines.map((l) {
@@ -74,6 +81,10 @@ class _PosHubViewState extends State<_PosHubView> {
   }
 
   Future<void> _openSale(Shift? openShift) async {
+    if (openShift == null) {
+      AppMessage.showError(context, 'Сначала откройте смену');
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MultiBlocProvider(
@@ -117,7 +128,9 @@ class _PosHubViewState extends State<_PosHubView> {
           child: TextField(
             controller: cashCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Наличные в кассе'),
+            decoration: const InputDecoration(
+              labelText: 'Наличные в кассе при открытии',
+            ),
           ),
         ),
         actions: [
@@ -140,20 +153,75 @@ class _PosHubViewState extends State<_PosHubView> {
         openingCash:
             double.tryParse(cashCtrl.text.replaceAll(',', '.')) ?? 0,
       );
-      if (mounted) AppMessage.showSuccess(context, 'Смена открыта');
+      if (mounted) {
+        setState(() => _lastClosed = null);
+        AppMessage.showSuccess(context, 'Смена открыта');
+      }
     } catch (_) {
       if (mounted) {
-        AppMessage.showError(
+        AppMessage.showError(context, cashier.state.error ?? 'Ошибка');
+      }
+    }
+  }
+
+  Future<void> _movement(Shift shift, {required bool deposit}) async {
+    final ctrl = TextEditingController();
+    final title = deposit ? 'Внос наличных' : 'Самоинкассация';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: AppDialogScrollBody(
+          child: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: deposit ? 'Сумма вноса' : 'Сумма изъятия',
+              suffixText: '₽',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(deposit ? 'Внести' : 'Изъять'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final amount = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0;
+    if (amount <= 0) {
+      AppMessage.showError(context, 'Укажите сумму больше 0');
+      return;
+    }
+    final cashier = context.read<CashierCubit>();
+    try {
+      await cashier.movement(
+        shiftId: shift.id,
+        kind: deposit ? 'deposit' : 'collection',
+        amount: amount,
+      );
+      if (mounted) {
+        AppMessage.showSuccess(
           context,
-          cashier.state.error ?? 'Ошибка',
+          deposit ? 'Внос ${formatRub(amount)}' : 'Изъято ${formatRub(amount)}',
         );
+      }
+    } catch (_) {
+      if (mounted) {
+        AppMessage.showError(context, cashier.state.error ?? 'Ошибка');
       }
     }
   }
 
   Future<void> _closeShift(Shift shift) async {
-    final expected = shift.expectedCash ??
-        (shift.openingCash + shift.cashSales - shift.cashRefunds);
+    final expected = shift.inDrawer;
     final ctrl = TextEditingController(text: expected.toStringAsFixed(2));
     final ok = await showDialog<bool>(
       context: context,
@@ -162,8 +230,10 @@ class _PosHubViewState extends State<_PosHubView> {
         content: AppDialogScrollBody(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Ожидается: ${formatRub(expected)}'),
+              Text('Ожидается в кассе: ${formatRub(expected)}'),
+              const SizedBox(height: 8),
               TextField(
                 controller: ctrl,
                 keyboardType:
@@ -188,19 +258,42 @@ class _PosHubViewState extends State<_PosHubView> {
     if (ok != true || !mounted) return;
     final cashier = context.read<CashierCubit>();
     try {
-      await cashier.closeShift(
+      final closed = await cashier.closeShift(
         shiftId: shift.id,
         actualCash: double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0,
       );
-      if (mounted) AppMessage.showSuccess(context, 'Смена закрыта');
+      if (mounted) {
+        setState(() => _lastClosed = closed);
+        AppMessage.showSuccess(context, 'Смена закрыта');
+      }
     } catch (_) {
       if (mounted) {
-        AppMessage.showError(
-          context,
-          cashier.state.error ?? 'Ошибка',
-        );
+        AppMessage.showError(context, cashier.state.error ?? 'Ошибка');
       }
     }
+  }
+
+  Widget _metric(String label, double value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.muted),
+            ),
+          ),
+          Text(
+            formatRub(value),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -219,6 +312,7 @@ class _PosHubViewState extends State<_PosHubView> {
       body: BlocBuilder<CashierCubit, CashierState>(
         builder: (context, cashierState) {
           final open = _openShift(cashierState);
+          final closed = _closedShifts(cashierState);
           return BlocBuilder<SalesCubit, SalesState>(
             builder: (context, salesState) {
               final loading = (cashierState.loading &&
@@ -240,18 +334,26 @@ class _PosHubViewState extends State<_PosHubView> {
                         vertical: 6,
                       ),
                       child: open == null
-                          ? Row(
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    'Смена не открыта',
-                                    style:
-                                        Theme.of(context).textTheme.titleMedium,
-                                  ),
+                                Text(
+                                  'Смена не открыта',
+                                  style:
+                                      Theme.of(context).textTheme.titleMedium,
                                 ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Откройте смену, чтобы принимать наличные и вести кассу.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: AppColors.muted),
+                                ),
+                                const SizedBox(height: 12),
                                 FilledButton(
                                   onPressed: _openShiftDialog,
-                                  child: const Text('Открыть'),
+                                  child: const Text('Открыть смену'),
                                 ),
                               ],
                             )
@@ -261,7 +363,7 @@ class _PosHubViewState extends State<_PosHubView> {
                                 Row(
                                   children: [
                                     const StatusChip(
-                                      label: 'Открыта',
+                                      label: 'Смена открыта',
                                       tone: StatusTone.success,
                                     ),
                                     const Spacer(),
@@ -271,23 +373,90 @@ class _PosHubViewState extends State<_PosHubView> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 8),
                                 Text(
-                                  'В кассе: ${formatRub(open.openingCash + open.cashSales - open.cashRefunds)}',
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                  'В кассе: ${formatRub(open.inDrawer)}',
+                                  style:
+                                      Theme.of(context).textTheme.headlineMedium,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Продажи нал. ${formatRub(open.cashSales)}'
-                                  ' · возвраты ${formatRub(open.cashRefunds)}',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(color: AppColors.muted),
+                                const SizedBox(height: 10),
+                                _metric('Открытие', open.openingCash),
+                                _metric('Продажи нал.', open.cashSales),
+                                _metric('Возвраты', open.cashRefunds),
+                                _metric('Вносы', open.cashIn),
+                                _metric('Самоинкассация', open.cashOut),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () =>
+                                            _movement(open, deposit: true),
+                                        child: const Text('Внос'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () =>
+                                            _movement(open, deposit: false),
+                                        child: const Text('Самоинкассация'),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                     ),
+                    if (_lastClosed != null)
+                      SoftCard(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Итог закрытой смены',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            _metric(
+                              'Ожидалось',
+                              _lastClosed!.expectedCash ??
+                                  _lastClosed!.inDrawer,
+                            ),
+                            _metric(
+                              'Факт',
+                              _lastClosed!.actualCash ?? 0,
+                            ),
+                            _metric(
+                              'Расхождение',
+                              _lastClosed!.discrepancy ?? 0,
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (closed.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: Text(
+                          'Недавние смены',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      for (final s in closed)
+                        EntityListTile(
+                          title: Text(
+                            'Закрыта · Δ ${formatRub(s.discrepancy ?? 0)}',
+                          ),
+                          subtitle: Text(
+                            'Ожид. ${formatRub(s.expectedCash ?? s.inDrawer)}'
+                            ' · факт ${formatRub(s.actualCash ?? 0)}',
+                          ),
+                        ),
+                    ],
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                       child: Text(
@@ -308,8 +477,7 @@ class _PosHubViewState extends State<_PosHubView> {
                           trailing: IconButton(
                             icon: const Icon(Icons.undo),
                             tooltip: 'Возврат',
-                            onPressed: () =>
-                                _openRefund(sale, open?.id),
+                            onPressed: () => _openRefund(sale, open?.id),
                           ),
                         ),
                   ],

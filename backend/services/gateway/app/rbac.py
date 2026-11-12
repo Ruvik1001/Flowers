@@ -17,12 +17,14 @@ def _has_any(claims: dict, required: list[str]) -> bool:
 # (service, METHOD, path_prefix) → any-of permissions. Longer prefixes match first.
 _RULES: list[tuple[str, str, str, list[str]]] = [
     ("identity", "POST", "users", ["identity.users.write"]),
+    ("identity", "GET", "users", ["identity.users.write"]),
     ("identity", "POST", "roles", ["identity.roles.write"]),
     ("identity", "GET", "roles", []),  # any authenticated (assignment UX)
     ("identity", "GET", "auth/me", []),  # any authenticated
     ("identity", "GET", "authz/", []),
     ("catalog", "GET", "", ["catalog.read"]),
     ("catalog", "POST", "", ["catalog.write"]),
+    ("catalog", "PATCH", "", ["catalog.write"]),
     ("procurement", "GET", "", ["procurement.read", "catalog.read"]),
     ("procurement", "POST", "", ["procurement.write", "catalog.write"]),
     ("inventory", "GET", "", ["inventory.read"]),

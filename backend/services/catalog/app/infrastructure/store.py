@@ -5,12 +5,16 @@ from decimal import Decimal
 from sqlalchemy import delete, select
 
 from shared.errors import AppError
-from shared.persistence.models import ProductRow, RecipeRow
+from shared.persistence.models import CategoryRow, ProductRow, RecipeRow
 from shared.persistence.persist_map import PersistMap
 from shared.persistence.runtime import db_session, persistence_enabled
 from shared.utils import Money
 
-from app.domain import Product, ProductKind, Recipe, RecipeItem
+from app.domain import Category, Product, ProductKind, Recipe, RecipeItem
+
+
+def _category_from_row(row: CategoryRow) -> Category:
+    return Category(id=row.id, name=row.name, archived=bool(row.archived))
 
 
 def _product_from_row(row: ProductRow) -> Product:
@@ -20,6 +24,7 @@ def _product_from_row(row: ProductRow) -> Product:
         kind=ProductKind(row.kind),
         sell_price=Money(row.sell_price),
         archived=bool(row.archived),
+        category_id=row.category_id,
     )
 
 
@@ -34,6 +39,11 @@ def _recipe_from_row(row: RecipeRow) -> Recipe:
 class CatalogStore:
     def __init__(self) -> None:
         self._persist = persistence_enabled()
+        self.categories: PersistMap[str, Category] = PersistMap(
+            on_set=self._save_category if self._persist else None,
+            on_del=self._delete_category if self._persist else None,
+            on_clear=self._clear_categories if self._persist else None,
+        )
         self.products: PersistMap[str, Product] = PersistMap(
             on_set=self._save_product if self._persist else None,
             on_del=self._delete_product if self._persist else None,
@@ -49,10 +59,31 @@ class CatalogStore:
 
     def _load(self) -> None:
         with db_session() as session:
+            categories = [
+                _category_from_row(r) for r in session.scalars(select(CategoryRow)).all()
+            ]
             products = [_product_from_row(r) for r in session.scalars(select(ProductRow)).all()]
             recipes = [_recipe_from_row(r) for r in session.scalars(select(RecipeRow)).all()]
+        self.categories.replace_all((c.id, c) for c in categories)
         self.products.replace_all((p.id, p) for p in products)
         self.recipes.replace_all((r.id, r) for r in recipes)
+
+    def _save_category(self, category_id: str, category: Category) -> None:
+        with db_session() as session:
+            row = session.get(CategoryRow, category_id) or CategoryRow(id=category_id)
+            row.name = category.name
+            row.archived = category.archived
+            session.merge(row)
+
+    def _delete_category(self, category_id: str) -> None:
+        with db_session() as session:
+            row = session.get(CategoryRow, category_id)
+            if row:
+                session.delete(row)
+
+    def _clear_categories(self) -> None:
+        with db_session() as session:
+            session.execute(delete(CategoryRow))
 
     def _save_product(self, product_id: str, product: Product) -> None:
         with db_session() as session:
@@ -61,6 +92,7 @@ class CatalogStore:
             row.kind = str(product.kind)
             row.sell_price = product.sell_price.amount
             row.archived = product.archived
+            row.category_id = product.category_id
             session.merge(row)
 
     def _delete_product(self, product_id: str) -> None:
@@ -78,7 +110,8 @@ class CatalogStore:
             row = session.get(RecipeRow, recipe_id) or RecipeRow(id=recipe_id)
             row.bouquet_id = recipe.bouquet_id
             row.items = [
-                {"product_id": item.product_id, "quantity": str(item.quantity)} for item in recipe.items
+                {"product_id": item.product_id, "quantity": str(item.quantity)}
+                for item in recipe.items
             ]
             row.archived = recipe.archived
             session.merge(row)
@@ -92,6 +125,11 @@ class CatalogStore:
     def _clear_recipes(self) -> None:
         with db_session() as session:
             session.execute(delete(RecipeRow))
+
+    def category(self, category_id: str) -> Category:
+        if category_id not in self.categories:
+            raise AppError("category_not_found", "Category not found", status_code=404)
+        return self.categories[category_id]
 
     def product(self, product_id: str) -> Product:
         if product_id not in self.products:

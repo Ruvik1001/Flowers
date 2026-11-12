@@ -17,9 +17,14 @@ def test_health_and_login_me_flow() -> None:
     )
     assert login.status_code == 200
     token = login.json()["access_token"]
-    me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    headers = {"Authorization": f"Bearer {token}"}
+    me = client.get("/api/v1/auth/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["is_admin"] is True
+    users = client.get("/api/v1/users", headers=headers)
+    assert users.status_code == 200
+    items = users.json()["items"]
+    assert any(u["email"] == "admin@flowers.local" for u in items)
 
 
 def test_create_user_and_role_and_object_scope() -> None:

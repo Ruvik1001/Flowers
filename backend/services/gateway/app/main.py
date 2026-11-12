@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from shared.auth.jwt import decode_token
@@ -61,6 +62,15 @@ def create_app(
 
     app = FastAPI(title="Flowers Gateway", lifespan=lifespan)
     app.state.limiter = SlidingWindowLimiter(cfg.rate_limit_per_minute)
+    # Allow Flutter web (and local tooling) to call the gateway during development.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Request-Id"],
+    )
     install_exception_handlers(app)
     install_readiness(app, "gateway")
     install_request_context_middleware(app, cfg.service_name)

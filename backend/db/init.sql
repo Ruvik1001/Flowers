@@ -29,12 +29,19 @@ CREATE TABLE IF NOT EXISTS identity.users (
 );
 
 -- catalog
+CREATE TABLE IF NOT EXISTS catalog.categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    archived BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 CREATE TABLE IF NOT EXISTS catalog.products (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     kind TEXT NOT NULL,
     sell_price NUMERIC(12,2) NOT NULL,
-    archived BOOLEAN NOT NULL DEFAULT FALSE
+    archived BOOLEAN NOT NULL DEFAULT FALSE,
+    category_id TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS catalog.recipes (

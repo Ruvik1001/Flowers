@@ -51,6 +51,15 @@ class UserRow(Base):
     object_scopes: Mapped[dict[str, Any]] = mapped_column(_json_type(), nullable=False, default=dict)
 
 
+class CategoryRow(Base):
+    __tablename__ = "categories"
+    __table_args__ = {"schema": "catalog"}
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
 class ProductRow(Base):
     __tablename__ = "products"
     __table_args__ = {"schema": "catalog"}
@@ -60,6 +69,7 @@ class ProductRow(Base):
     kind: Mapped[str] = mapped_column(String, nullable=False)
     sell_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    category_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class RecipeRow(Base):

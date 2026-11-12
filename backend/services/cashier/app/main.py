@@ -9,6 +9,7 @@ from shared.fastapi_ext import (
 from shared.persistence.outbox_bus import build_outbox_bus, outbox_lifespan
 from app.application import CashierService
 from app.config import settings
+from app.domain import MovementKind
 from app.infrastructure.store import store
 
 # Request path publishes into the transactional outbox; the lifespan worker relays to Redis.
@@ -28,6 +29,11 @@ class OpenIn(BaseModel):
 class RecordIn(BaseModel):
     amount: Decimal = Field(gt=0)
     refund: bool = False
+
+
+class MovementIn(BaseModel):
+    kind: MovementKind
+    amount: Decimal = Field(gt=0)
 
 
 class CloseIn(BaseModel):
@@ -52,6 +58,11 @@ def open_shift(body: OpenIn): return service.open(**body.model_dump())
 def record(shift_id: str, body: RecordIn): return service.record_cash(shift_id, **body.model_dump())
 
 
+@app.post("/api/v1/shifts/{shift_id}/movements")
+def movement(shift_id: str, body: MovementIn):
+    return service.record_movement(shift_id, body.kind, body.amount)
+
+
 @app.post("/api/v1/shifts/{shift_id}/close")
 def close(shift_id: str, body: CloseIn):
     shift = service.close(shift_id, body.actual_cash)
@@ -60,6 +71,11 @@ def close(shift_id: str, body: CloseIn):
         "cashier_id": shift.cashier_id,
         "opened_at": shift.opened_at,
         "closed_at": shift.closed_at,
+        "opening_cash": shift.opening_cash.amount,
+        "cash_sales": shift.cash_sales.amount,
+        "cash_refunds": shift.cash_refunds.amount,
+        "cash_in": shift.cash_in.amount,
+        "cash_out": shift.cash_out.amount,
         "expected_cash": shift.expected_cash.amount,
         "actual_cash": shift.actual_cash.amount,
         "discrepancy": shift.discrepancy.amount,

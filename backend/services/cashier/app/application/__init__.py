@@ -5,7 +5,7 @@ from shared.messaging import DomainEvent, EventNames, InMemoryStreamBus, StreamB
 from shared.persistence.runtime import unit_of_work
 from shared.utils import Money
 
-from app.domain import Shift
+from app.domain import MovementKind, Shift
 from app.infrastructure.store import CashierStore
 
 
@@ -24,6 +24,16 @@ class CashierService:
     def record_cash(self, shift_id: str, amount: Decimal, refund: bool = False) -> Shift:
         shift = self.store.get(shift_id)
         shift.record(amount, refund)
+        with unit_of_work():
+            self.store.shifts[shift.id] = shift
+        return shift
+
+    def record_movement(
+        self, shift_id: str, kind: MovementKind | str, amount: Decimal
+    ) -> Shift:
+        shift = self.store.get(shift_id)
+        movement = kind if isinstance(kind, MovementKind) else MovementKind(kind)
+        shift.record_movement(movement, amount)
         with unit_of_work():
             self.store.shifts[shift.id] = shift
         return shift

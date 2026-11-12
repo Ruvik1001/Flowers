@@ -29,6 +29,8 @@ def _shift_payload(item: Shift) -> dict:
         "opened_at": item.opened_at.isoformat(),
         "cash_sales": str(item.cash_sales.amount),
         "cash_refunds": str(item.cash_refunds.amount),
+        "cash_in": str(item.cash_in.amount),
+        "cash_out": str(item.cash_out.amount),
         "closed_at": item.closed_at.isoformat() if item.closed_at else None,
         "actual_cash": str(item.actual_cash.amount) if item.actual_cash is not None else None,
     }
@@ -43,6 +45,8 @@ def _shift_from_payload(payload: dict) -> Shift:
         opened_at=_parse_dt(payload["opened_at"]),
         cash_sales=Money(payload.get("cash_sales", "0")),
         cash_refunds=Money(payload.get("cash_refunds", "0")),
+        cash_in=Money(payload.get("cash_in", "0")),
+        cash_out=Money(payload.get("cash_out", "0")),
         closed_at=_parse_dt(payload.get("closed_at")),
         actual_cash=Money(actual) if actual is not None else None,
     )

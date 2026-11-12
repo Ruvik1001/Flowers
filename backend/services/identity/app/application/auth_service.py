@@ -90,6 +90,30 @@ class AuthService:
                 )
         return user
 
+    def list_users(self, actor: AuthUser) -> list[dict]:
+        if not actor.is_admin and "identity.users.write" not in actor.permissions:
+            raise AppError(
+                "forbidden",
+                "Admin or identity.users.write required",
+                status_code=403,
+            )
+        items: list[dict] = []
+        for user in store.users.values():
+            items.append(
+                {
+                    "id": user.id,
+                    "email": user.email,
+                    "is_admin": user.is_admin,
+                    "is_active": user.is_active,
+                    "role_ids": list(user.role_ids),
+                    "roles": [
+                        store.roles[r].name for r in user.role_ids if r in store.roles
+                    ],
+                }
+            )
+        items.sort(key=lambda x: x["email"])
+        return items
+
     def me(self, user_id: str) -> dict:
         user = store.get_user(user_id)
         return {

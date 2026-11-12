@@ -89,6 +89,10 @@ def create_app() -> FastAPI:
     def me(user: AuthUser = Depends(current_user)) -> dict:
         return auth_service.me(user.id)
 
+    @app.get("/api/v1/users")
+    def list_users(user: AuthUser = Depends(current_user)) -> dict:
+        return {"items": auth_service.list_users(user)}
+
     @app.post("/api/v1/users")
     def create_user(body: CreateUserRequest, user: AuthUser = Depends(current_user)) -> dict:
         created = auth_service.create_user(

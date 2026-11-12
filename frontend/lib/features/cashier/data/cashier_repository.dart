@@ -45,6 +45,21 @@ class CashierRepository {
     );
   }
 
+  Future<Shift> movement({
+    required String shiftId,
+    required String kind,
+    required double amount,
+  }) {
+    return _api.post<Shift>(
+      '/cashier/shifts/$shiftId/movements',
+      data: {
+        'kind': kind,
+        'amount': moneyToApi(amount),
+      },
+      parse: (data) => Shift.fromJson(asJsonMap(data)),
+    );
+  }
+
   Future<Shift> close({
     required String shiftId,
     required double actualCash,

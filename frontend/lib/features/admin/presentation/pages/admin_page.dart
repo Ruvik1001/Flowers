@@ -9,7 +9,9 @@ import 'package:flowers/core/widgets/async_body.dart';
 import 'package:flowers/core/widgets/entity_list_tile.dart';
 import 'package:flowers/core/widgets/section_header.dart';
 import 'package:flowers/core/widgets/soft_card.dart';
+import 'package:flowers/core/widgets/status_chip.dart';
 import 'package:flowers/features/admin/domain/entities/role.dart';
+import 'package:flowers/features/admin/domain/entities/staff_user.dart';
 import 'package:flowers/features/admin/presentation/cubit/admin_cubit.dart';
 import 'package:flowers/features/admin/presentation/cubit/admin_state.dart';
 
@@ -42,12 +44,36 @@ class _AdminView extends StatelessWidget {
         },
         builder: (context, state) {
           return AsyncBody(
-            loading: state.loading && state.roles.isEmpty,
+            loading: state.loading &&
+                state.roles.isEmpty &&
+                state.users.isEmpty,
             error: state.error,
             onRetry: () => context.read<AdminCubit>().load(),
             child: ListView(
               padding: const EdgeInsets.only(bottom: 32),
               children: [
+                const SectionHeader(
+                  title: 'Сотрудники',
+                  subtitle: 'Учётные записи и роли',
+                ),
+                if (state.users.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('Нет пользователей или нет доступа к списку'),
+                  )
+                else
+                  ...state.users.map(_UserTile.new),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: SoftCard(
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          _showCreateUserDialog(context, state.roles),
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('Создать пользователя'),
+                    ),
+                  ),
+                ),
                 const SectionHeader(
                   title: 'Роли',
                   subtitle: 'Права доступа сотрудников',
@@ -60,24 +86,12 @@ class _AdminView extends StatelessWidget {
                 else
                   ...state.roles.map(_RoleTile.new),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: SoftCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: () =>
-                              _showCreateUserDialog(context, state.roles),
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('Создать пользователя'),
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton.icon(
-                          onPressed: () => _showCreateRoleDialog(context),
-                          icon: const Icon(Icons.security),
-                          label: const Text('Создать роль'),
-                        ),
-                      ],
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showCreateRoleDialog(context),
+                      icon: const Icon(Icons.security),
+                      label: const Text('Создать роль'),
                     ),
                   ),
                 ),
@@ -85,6 +99,31 @@ class _AdminView extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _UserTile extends StatelessWidget {
+  const _UserTile(this.user);
+
+  final StaffUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final roles = user.roles.isEmpty
+        ? (user.isAdmin ? 'Админ' : 'Без роли')
+        : user.roles.join(', ');
+    return EntityListTile(
+      title: Text(user.email),
+      subtitle: Text(roles),
+      trailing: StatusChip(
+        label: user.isActive
+            ? (user.isAdmin ? 'Админ' : 'Активен')
+            : 'Отключён',
+        tone: user.isActive
+            ? (user.isAdmin ? StatusTone.accent : StatusTone.success)
+            : StatusTone.danger,
       ),
     );
   }
@@ -142,23 +181,34 @@ Future<void> _showCreateUserDialog(
                       style: Theme.of(ctx).textTheme.labelLarge,
                     ),
                   ),
-                  ...roles.map(
-                    (role) => CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(role.name),
-                      value: selected.contains(role.id),
-                      onChanged: (v) {
-                        setState(() {
-                          if (v == true) {
-                            selected.add(role.id);
-                          } else {
-                            selected.remove(role.id);
-                          }
-                        });
-                      },
+                  if (roles.isEmpty)
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Сначала создайте роль'),
+                    )
+                  else
+                    ...roles.map(
+                      (role) => CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(role.name),
+                        subtitle: Text(
+                          Labels.permissionsList(role.permissions),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        value: selected.contains(role.id),
+                        onChanged: (v) {
+                          setState(() {
+                            if (v == true) {
+                              selected.add(role.id);
+                            } else {
+                              selected.remove(role.id);
+                            }
+                          });
+                        },
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -178,6 +228,12 @@ Future<void> _showCreateUserDialog(
     },
   );
   if (ok != true) return;
+  if (emailCtrl.text.trim().isEmpty || passwordCtrl.text.isEmpty) {
+    if (context.mounted) {
+      AppMessage.showError(context, 'Укажите почту и пароль');
+    }
+    return;
+  }
   try {
     await cubit.createUser(
       email: emailCtrl.text.trim(),
@@ -186,7 +242,10 @@ Future<void> _showCreateUserDialog(
     );
   } catch (_) {
     if (context.mounted) {
-      AppMessage.showError(context, 'Ошибка создания пользователя');
+      AppMessage.showError(
+        context,
+        cubit.state.error ?? 'Ошибка создания пользователя',
+      );
     }
   }
 }
@@ -268,7 +327,10 @@ Future<void> _showCreateRoleDialog(BuildContext context) async {
     );
   } catch (_) {
     if (context.mounted) {
-      AppMessage.showError(context, 'Ошибка создания роли');
+      AppMessage.showError(
+        context,
+        cubit.state.error ?? 'Ошибка создания роли',
+      );
     }
   }
 }

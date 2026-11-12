@@ -8,6 +8,7 @@ class Product extends Equatable {
     required this.kind,
     required this.sellPrice,
     required this.archived,
+    this.categoryId,
   });
 
   final String id;
@@ -15,6 +16,7 @@ class Product extends Equatable {
   final String kind;
   final double sellPrice;
   final bool archived;
+  final String? categoryId;
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
@@ -23,9 +25,11 @@ class Product extends Equatable {
       kind: json['kind']?.toString() ?? '',
       sellPrice: parseMoney(json['sell_price']),
       archived: json['archived'] == true,
+      categoryId: json['category_id']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props => [id, name, kind, sellPrice, archived];
+  List<Object?> get props =>
+      [id, name, kind, sellPrice, archived, categoryId];
 }

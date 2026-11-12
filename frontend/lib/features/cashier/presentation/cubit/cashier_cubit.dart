@@ -1,7 +1,8 @@
 import 'package:flowers/core/bloc/safe_cubit.dart';
 import 'package:flowers/core/errors/app_failure.dart';
-import 'package:flowers/features/cashier/presentation/cubit/cashier_state.dart';
 import 'package:flowers/features/cashier/data/cashier_repository.dart';
+import 'package:flowers/features/cashier/domain/entities/shift.dart';
+import 'package:flowers/features/cashier/presentation/cubit/cashier_state.dart';
 
 class CashierCubit extends SafeCubit<CashierState> {
   CashierCubit(this._repository) : super(const CashierState());
@@ -51,13 +52,36 @@ class CashierCubit extends SafeCubit<CashierState> {
     }
   }
 
-  Future<void> closeShift({
+  Future<Shift> movement({
+    required String shiftId,
+    required String kind,
+    required double amount,
+  }) async {
+    try {
+      final shift = await _repository.movement(
+        shiftId: shiftId,
+        kind: kind,
+        amount: amount,
+      );
+      await load();
+      return shift;
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
+  Future<Shift> closeShift({
     required String shiftId,
     required double actualCash,
   }) async {
     try {
-      await _repository.close(shiftId: shiftId, actualCash: actualCash);
+      final closed = await _repository.close(
+        shiftId: shiftId,
+        actualCash: actualCash,
+      );
       await load();
+      return closed;
     } on AppFailure catch (e) {
       emit(state.copyWith(error: e.message));
       rethrow;

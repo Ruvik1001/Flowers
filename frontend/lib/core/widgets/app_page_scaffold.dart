@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flowers/core/widgets/gradient_background.dart';
+import 'package:flowers/core/widgets/responsive.dart';
 
 class AppPageScaffold extends StatelessWidget {
   const AppPageScaffold({
@@ -11,6 +12,7 @@ class AppPageScaffold extends StatelessWidget {
     this.body,
     this.padding,
     this.extendBodyBehindAppBar = false,
+    this.maxContentWidth = 960,
   });
 
   final Widget? title;
@@ -20,9 +22,18 @@ class AppPageScaffold extends StatelessWidget {
   final Widget? body;
   final EdgeInsetsGeometry? padding;
   final bool extendBodyBehindAppBar;
+  final double? maxContentWidth;
 
   @override
   Widget build(BuildContext context) {
+    Widget? content = body;
+    if (content != null && padding != null) {
+      content = Padding(padding: padding!, child: content);
+    }
+    if (content != null && maxContentWidth != null) {
+      content = ContentWidth(maxWidth: maxContentWidth!, child: content);
+    }
+
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -37,9 +48,7 @@ class AppPageScaffold extends StatelessWidget {
         floatingActionButton: floatingActionButton == null
             ? null
             : ScaleTransitionFab(child: floatingActionButton!),
-        body: padding == null
-            ? body
-            : Padding(padding: padding!, child: body),
+        body: content,
       ),
     );
   }

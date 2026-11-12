@@ -1,0 +1,31 @@
+# Production collector: forward traces to MonitoringPLTG (OTLP_MONITORING_ENDPOINT).
+# Debug exporter is secondary only (verbosity basic).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+  otlphttp/monitoring:
+    endpoint: ${env:OTLP_MONITORING_ENDPOINT}
+    tls:
+      insecure: ${env:OTLP_MONITORING_INSECURE:-true}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/monitoring, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

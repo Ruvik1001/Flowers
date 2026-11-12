@@ -12,6 +12,10 @@ Monorepo for a flower shop management system.
 
 Long-lived branches: `master`, `backend`, `frontend`. See `COLLAB.md`.
 
+## Backend
+
+See [`backend/README.md`](backend/README.md) and architecture docs in `backend/docs/`.
+
 ## Docs
 
 - English: `README.md`

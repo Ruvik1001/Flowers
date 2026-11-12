@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowers/app/shell/home_shell.dart';
 import 'package:flowers/app/theme/app_theme.dart';
+import 'package:flowers/core/widgets/app_page_scaffold.dart';
 import 'package:flowers/core/widgets/entity_list_tile.dart';
 import 'package:flowers/features/admin/presentation/pages/admin_page.dart';
 import 'package:flowers/features/analytics/presentation/pages/analytics_page.dart';
@@ -11,11 +12,10 @@ import 'package:flowers/features/audit/presentation/pages/audit_page.dart';
 import 'package:flowers/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:flowers/features/auth/presentation/cubit/auth_state.dart';
 import 'package:flowers/features/auth/presentation/pages/login_page.dart';
-import 'package:flowers/features/cashier/presentation/pages/cashier_page.dart';
 import 'package:flowers/features/catalog/presentation/pages/catalog_page.dart';
 import 'package:flowers/features/inventory/presentation/pages/inventory_page.dart';
 import 'package:flowers/features/procurement/presentation/pages/procurement_page.dart';
-import 'package:flowers/features/sales/presentation/pages/sales_page.dart';
+import 'package:flowers/features/sales/presentation/pages/pos_hub_page.dart';
 
 class AuthRefresh extends ChangeNotifier {
   void ping() => notifyListeners();
@@ -26,7 +26,7 @@ GoRouter createRouter({
   required AuthRefresh refresh,
 }) {
   return GoRouter(
-    initialLocation: '/catalog',
+    initialLocation: '/pos',
     refreshListenable: refresh,
     redirect: (context, state) {
       final auth = authCubit.state;
@@ -35,7 +35,12 @@ GoRouter createRouter({
       if (auth is Unauthenticated || auth is AuthFailure) {
         return loggingIn ? null : '/login';
       }
-      if (auth is Authenticated && loggingIn) return '/catalog';
+      if (auth is Authenticated && loggingIn) return '/pos';
+      // Legacy paths
+      if (state.matchedLocation == '/sales' ||
+          state.matchedLocation == '/cashier') {
+        return '/pos';
+      }
       return null;
     },
     routes: [
@@ -61,14 +66,13 @@ GoRouter createRouter({
             ),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: '/sales', builder: (_, __) => const SalesPage()),
+            GoRoute(path: '/pos', builder: (_, __) => const PosHubPage()),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/more', builder: (_, __) => const MoreHubPage()),
           ]),
         ],
       ),
-      GoRoute(path: '/cashier', builder: (_, __) => const CashierPage()),
       GoRoute(path: '/assembly', builder: (_, __) => const AssemblyPage()),
       GoRoute(path: '/analytics', builder: (_, __) => const AnalyticsPage()),
       GoRoute(path: '/audit', builder: (_, __) => const AuditPage()),
@@ -83,15 +87,13 @@ class MoreHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(String, String, IconData)>[
-      ('/cashier', 'Касса', Icons.point_of_sale_outlined),
       ('/assembly', 'Сборка', Icons.local_florist_outlined),
       ('/analytics', 'Аналитика', Icons.insights_outlined),
       ('/audit', 'Аудит', Icons.history_outlined),
       ('/admin', 'Админ', Icons.admin_panel_settings_outlined),
     ];
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Ещё')),
+    return AppPageScaffold(
+      title: const Text('Ещё'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
         children: [
@@ -135,13 +137,13 @@ class _MoreIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 42,
-      height: 42,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
-        color: background ?? AppColors.mist,
-        shape: BoxShape.circle,
+        color: background ?? AppColors.leaf.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
       ),
-      child: Icon(icon, color: color, size: 22),
+      child: Icon(icon, color: color),
     );
   }
 }

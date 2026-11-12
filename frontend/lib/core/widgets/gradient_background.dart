@@ -64,7 +64,7 @@ class GradientBackground extends StatelessWidget {
               ),
             ),
           ),
-          child,
+          Positioned.fill(child: child),
         ],
       ),
     );

@@ -4,6 +4,21 @@ import 'package:flowers/features/procurement/domain/entities/supply_line.dart';
 import 'package:flowers/features/procurement/presentation/cubit/procurement_state.dart';
 import 'package:flowers/features/procurement/data/procurement_repository.dart';
 
+class AcceptBatchResult {
+  const AcceptBatchResult({
+    required this.requested,
+    required this.succeeded,
+    this.error,
+  });
+
+  final int requested;
+  final int succeeded;
+  final String? error;
+
+  bool get partial => succeeded > 0 && succeeded < requested;
+  bool get failed => succeeded == 0 && error != null;
+}
+
 class ProcurementCubit extends SafeCubit<ProcurementState> {
   ProcurementCubit(this._repository) : super(const ProcurementState());
 
@@ -68,5 +83,38 @@ class ProcurementCubit extends SafeCubit<ProcurementState> {
       emit(state.copyWith(error: e.message));
       rethrow;
     }
+  }
+
+  /// Sequential accepts. Already-successful lines are kept (API has no txn).
+  Future<AcceptBatchResult> acceptLines({
+    required String supplyId,
+    required List<({String productId, double quantity})> lines,
+  }) async {
+    final actionable =
+        lines.where((l) => l.quantity > 0).toList(growable: false);
+    var ok = 0;
+    String? error;
+    for (final line in actionable) {
+      try {
+        await _repository.acceptLine(
+          supplyId: supplyId,
+          productId: line.productId,
+          quantity: line.quantity,
+        );
+        ok++;
+      } on AppFailure catch (e) {
+        error = e.message;
+        break;
+      } catch (e) {
+        error = e.toString();
+        break;
+      }
+    }
+    await load();
+    return AcceptBatchResult(
+      requested: actionable.length,
+      succeeded: ok,
+      error: error,
+    );
   }
 }

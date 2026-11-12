@@ -5,6 +5,7 @@ Short description: Create supply orders, list them and accept delivered quantiti
 Persisted in Postgres (`procurement.supplies`). Accepting a line synchronously calls inventory (`POST /api/v1/lots`) and emits `SupplyAccepted` through the transactional outbox (relayed to Redis by the outbox worker; consumed by audit/analytics). Gateway-level errors (`401`, `429`, `502`, `500`) apply – see `22_battlepersist_common_errors.md`.
 
 All quantities in supply responses are **strings**; `quantity` and `ordered` carry the same value (kept for FE compatibility).
+`created_at` is an ISO-8601 timestamp set when the supply is created (stored in the JSONB payload).
 
 ## 1. List supplies
 
@@ -46,6 +47,7 @@ Authorization: Bearer <access_token>
   {
     "id": "9c1b6c4f-5b0e-4f55-8b2c-0d9b5a7a3e21",
     "supplier_id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11",
+    "created_at": "2026-03-20T10:15:00+00:00",
     "lines": [
       {
         "product_id": "882dcff1-b5bd-41e9-867f-c3c5a1a70a25",
@@ -117,6 +119,7 @@ Content-Type: application/json
 {
   "id": "9c1b6c4f-5b0e-4f55-8b2c-0d9b5a7a3e21",
   "supplier_id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11",
+  "created_at": "2026-03-20T10:15:00+00:00",
   "lines": [
     {
       "product_id": "882dcff1-b5bd-41e9-867f-c3c5a1a70a25",
@@ -184,6 +187,7 @@ Content-Type: application/json
 {
   "id": "9c1b6c4f-5b0e-4f55-8b2c-0d9b5a7a3e21",
   "supplier_id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11",
+  "created_at": "2026-03-20T10:15:00+00:00",
   "lines": [
     {
       "product_id": "882dcff1-b5bd-41e9-867f-c3c5a1a70a25",

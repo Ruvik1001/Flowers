@@ -46,5 +46,10 @@ def test_http_adapter_and_api():
     supplier = client.post("/api/v1/suppliers", json={"name": "S"}).json()
     supply = client.post("/api/v1/supplies", json={"supplier_id": supplier["id"], "lines": [{"product_id": "x", "quantity": 2, "unit_cost": 3}]})
     assert supply.status_code == 201
+    body = supply.json()
+    assert body["created_at"]
+    listed = client.get("/api/v1/supplies").json()
     assert len(client.get("/api/v1/suppliers").json()) == 1
-    assert len(client.get("/api/v1/supplies").json()) == 1
+    assert len(listed) == 1
+    assert listed[0]["created_at"] == body["created_at"]
+    assert listed[0]["lines"][0]["product_id"] == "x"

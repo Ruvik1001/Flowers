@@ -10,12 +10,14 @@ class Sale extends Equatable {
     required this.total,
     required this.lines,
     required this.payments,
+    this.shiftId,
   });
 
   final String id;
   final double total;
   final List<SaleLine> lines;
   final List<Payment> payments;
+  final String? shiftId;
 
   factory Sale.fromJson(Map<String, dynamic> json) {
     return Sale(
@@ -29,9 +31,10 @@ class Sale extends Equatable {
               ?.map((e) => Payment.fromJson(asJsonMap(e)))
               .toList() ??
           const [],
+      shiftId: json['shift_id']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props => [id, total, lines, payments];
+  List<Object?> get props => [id, total, lines, payments, shiftId];
 }

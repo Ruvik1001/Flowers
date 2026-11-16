@@ -35,6 +35,7 @@ def _sale_payload(item: Sale) -> dict:
         ],
         "allocations": _json_safe(item.allocations),
         "refunded": str(item.refunded.amount),
+        "shift_id": item.shift_id,
     }
 
 
@@ -55,6 +56,7 @@ def _sale_from_payload(payload: dict) -> Sale:
         allocations=list(payload.get("allocations") or []),
         id=payload["id"],
         refunded=Money(payload.get("refunded", "0")),
+        shift_id=payload.get("shift_id"),
     )
 
 

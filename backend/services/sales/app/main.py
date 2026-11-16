@@ -56,6 +56,7 @@ def _sale_dict(sale):
     return {
         "id": sale.id,
         "total": str(sale.total.amount),
+        "shift_id": sale.shift_id,
         "lines": [
             {
                 "product_id": line.product_id,

@@ -15,6 +15,7 @@ import 'package:flowers/features/auth/presentation/cubit/auth_state.dart';
 import 'package:flowers/features/cashier/domain/entities/shift.dart';
 import 'package:flowers/features/cashier/presentation/cubit/cashier_cubit.dart';
 import 'package:flowers/features/cashier/presentation/cubit/cashier_state.dart';
+import 'package:flowers/features/cashier/presentation/pages/shift_detail_page.dart';
 import 'package:flowers/features/sales/domain/entities/sale.dart';
 import 'package:flowers/features/sales/presentation/cubit/sales_cubit.dart';
 import 'package:flowers/features/sales/presentation/cubit/sales_state.dart';
@@ -69,7 +70,29 @@ class _PosHubViewState extends State<_PosHubView> {
   List<Shift> _closedShifts(CashierState state) {
     final closed = state.shifts.where((s) => !s.isOpen).toList();
     closed.sort((a, b) => (b.closedAt ?? '').compareTo(a.closedAt ?? ''));
-    return closed.take(8).toList();
+    return closed;
+  }
+
+  Map<int, List<Shift>> _closedByYear(List<Shift> closed) {
+    final map = <int, List<Shift>>{};
+    for (final s in closed) {
+      final year = DateTime.tryParse(s.closedAt ?? '')?.toLocal().year ??
+          DateTime.tryParse(s.openedAt ?? '')?.toLocal().year ??
+          DateTime.now().year;
+      map.putIfAbsent(year, () => []).add(s);
+    }
+    return map;
+  }
+
+  double _shiftRevenue(Shift shift, List<Sale> sales) {
+    return sales
+        .where((s) => s.shiftId == shift.id)
+        .fold<double>(0, (sum, s) => sum + s.total);
+  }
+
+  List<Sale> _salesForShift(Shift? shift, List<Sale> sales) {
+    if (shift == null) return const [];
+    return sales.where((s) => s.shiftId == shift.id).toList();
   }
 
   String _lineSummary(Sale sale) {
@@ -89,6 +112,18 @@ class _PosHubViewState extends State<_PosHubView> {
     final mm = local.month.toString().padLeft(2, '0');
     final yyyy = local.year.toString();
     return '$dd.$mm.$yyyy';
+  }
+
+  Future<void> _openShiftDetail(Shift shift, List<Sale> allSales) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ShiftDetailPage(
+          shift: shift,
+          sales: _salesForShift(shift, allSales),
+          productNames: _productNames,
+        ),
+      ),
+    );
   }
 
   Future<void> _openSale(Shift? openShift) async {
@@ -450,46 +485,72 @@ class _PosHubViewState extends State<_PosHubView> {
                         ),
                       ),
                     if (closed.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                        child: Text(
-                          'Недавние смены',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      for (final s in closed)
-                        EntityListTile(
-                          title: Text(
-                            '${_formatShiftDate(s.closedAt)} · Закрыта'
-                            ' · Δ ${formatRub(s.discrepancy ?? 0)}',
-                          ),
-                          subtitle: Text(
-                            'Ожид. ${formatRub(s.expectedCash ?? s.inDrawer)}'
-                            ' · факт ${formatRub(s.actualCash ?? 0)}',
-                          ),
-                        ),
+                      ...() {
+                        final byYear = _closedByYear(closed);
+                        final years = byYear.keys.toList()
+                          ..sort((a, b) => b.compareTo(a));
+                        return [
+                          for (final year in years) ...[
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                              child: Text(
+                                'Смены $year года',
+                                style:
+                                    Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            for (final s in byYear[year]!)
+                              EntityListTile(
+                                onTap: () =>
+                                    _openShiftDetail(s, salesState.sales),
+                                title: Text(
+                                  '${_formatShiftDate(s.closedAt)} · Закрыта'
+                                  ' · выручка ${formatRub(_shiftRevenue(s, salesState.sales))}',
+                                ),
+                                subtitle: Text(
+                                  'Ожид. ${formatRub(s.expectedCash ?? s.inDrawer)}'
+                                  ' · факт ${formatRub(s.actualCash ?? 0)}'
+                                  ' · Δ ${formatRub(s.discrepancy ?? 0)}',
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                              ),
+                          ],
+                        ];
+                      }(),
                     ],
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                       child: Text(
-                        'Продажи',
+                        open == null
+                            ? 'Продажи открытой смены'
+                            : 'Продажи текущей смены',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
-                    if (salesState.sales.isEmpty)
+                    if (open == null)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Откройте смену, чтобы видеть её продажи. '
+                          'Закрытые смены — в списке выше.',
+                        ),
+                      )
+                    else if (_salesForShift(open, salesState.sales).isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(24),
                         child: Text('Пока нет продаж'),
                       )
                     else
-                      for (final sale in salesState.sales)
+                      for (final sale
+                          in _salesForShift(open, salesState.sales))
                         EntityListTile(
                           title: Text(formatRub(sale.total)),
                           subtitle: Text(_lineSummary(sale)),
                           trailing: IconButton(
                             icon: const Icon(Icons.undo),
                             tooltip: 'Возврат',
-                            onPressed: () => _openRefund(sale, open?.id),
+                            onPressed: () => _openRefund(sale, open.id),
                           ),
                         ),
                   ],

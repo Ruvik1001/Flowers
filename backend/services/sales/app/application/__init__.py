@@ -75,7 +75,7 @@ class SalesService:
             SaleLine(x["product_id"], Decimal(str(x["quantity"])), Money(x["unit_price"])) for x in lines
         ]
         sale_payments = [Payment(PaymentMethod(x["method"]), Money(x["amount"])) for x in payments]
-        sale = Sale(sale_lines, sale_payments, [])
+        sale = Sale(sale_lines, sale_payments, [], shift_id=shift_id)
         sale.validate()
         consumed: list[dict] = []
         try:

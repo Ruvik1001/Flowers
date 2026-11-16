@@ -33,6 +33,7 @@ class _AnalyticsView extends StatefulWidget {
 
 class _AnalyticsViewState extends State<_AnalyticsView> {
   Map<String, String> _productNames = {};
+  Map<String, String> _shiftLabels = {};
 
   @override
   void initState() {
@@ -43,16 +44,36 @@ class _AnalyticsViewState extends State<_AnalyticsView> {
   Future<void> _loadNames() async {
     try {
       final products = await Di.I.catalog.listProducts(includeArchived: true);
+      final shifts = await Di.I.cashier.listShifts();
       if (!mounted) return;
       setState(() {
         _productNames = {for (final p in products) p.id: p.name};
+        _shiftLabels = {
+          for (final s in shifts) s.id: _formatShiftLabel(s.closedAt ?? s.openedAt),
+        };
       });
     } catch (_) {}
+  }
+
+  String _formatShiftLabel(String? raw) {
+    if (raw == null || raw.isEmpty) return 'Смена';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    final local = parsed.toLocal();
+    final dd = local.day.toString().padLeft(2, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    final yyyy = local.year.toString();
+    return '$dd.$mm.$yyyy';
   }
 
   String _productName(String? id) {
     if (id == null || id.isEmpty) return 'Товар';
     return _productNames[id] ?? _shortId(id);
+  }
+
+  String _shiftName(String? id) {
+    if (id == null || id.isEmpty || id == 'unassigned') return 'Без смены';
+    return _shiftLabels[id] ?? _shortId(id);
   }
 
   String _shortId(String id) {
@@ -84,9 +105,11 @@ class _AnalyticsViewState extends State<_AnalyticsView> {
               _ReportRow(
                 name == 'revenue-by-day'
                     ? (raw['key']?.toString() ?? 'День')
-                    : _shortId(raw['key']?.toString() ?? 'Смена'),
+                    : _shiftName(raw['key']?.toString()),
                 formatRub(_num(raw['value'])),
-                subtitle: name == 'cash-gaps' ? 'Расхождение' : 'Сумма',
+                subtitle: name == 'cash-gaps'
+                    ? 'Расхождение'
+                    : (name == 'revenue-by-shift' ? 'Выручка' : 'Сумма'),
               ),
         ];
       case 'sales-by-product':

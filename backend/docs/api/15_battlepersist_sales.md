@@ -46,6 +46,7 @@ Authorization: Bearer <access_token>
   {
     "id": "0b8f4a4e-31d3-4c11-b0c8-5f2f4e7b9a10",
     "total": "300.00",
+    "shift_id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11",
     "lines": [
       { "product_id": "882dcff1-b5bd-41e9-867f-c3c5a1a70a25", "quantity": "2", "unit_price": "150.00" }
     ],
@@ -68,7 +69,7 @@ Only the common gateway/auth errors.
 
 Creates a sale. Rules: at least one line and one payment; sum of `payments[].amount` must equal the computed total (`Σ quantity × unit_price`, rounded to 2 decimals). Stock is consumed per line in order; unit prices come from the request (not re-read from the catalog). Responds `201`.
 
-Extra body fields (e.g. `shift_id`) are ignored by the service; to attribute cash to a shift call `POST /api/v1/cashier/shifts/{id}/cash` separately.
+Optional `shift_id` is persisted and returned on the sale (also published on `SaleCompleted`). Cash drawer still needs a separate `POST /api/v1/cashier/shifts/{id}/cash` for cash payments.
 
 ### Endpoint name
 
@@ -97,6 +98,7 @@ None.
 | `payments` | array | yes | min 1 |
 | `payments[].method` | enum | yes | `cash` \| `card` \| `transfer` |
 | `payments[].amount` | decimal | yes | > 0 |
+| `shift_id` | string \| null | no | Cashier shift id for attribution |
 
 ### Request example
 

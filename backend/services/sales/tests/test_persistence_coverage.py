@@ -13,13 +13,14 @@ from app.domain import Payment, PaymentMethod, Refund, RefundKind, Sale, SaleLin
 store_module = importlib.import_module("app.infrastructure.store")
 
 
-def make_sale(sale_id="sale-1", refunded="0") -> Sale:
+def make_sale(sale_id="sale-1", refunded="0", shift_id=None) -> Sale:
     return Sale(
         lines=[SaleLine("rose", Decimal("2"), Money("10"))],
         payments=[Payment(PaymentMethod.CARD, Money("20"))],
         allocations=[{"lot_id": "l1", "quantity": Decimal("2"), "unit_cost": Decimal("4")}],
         id=sale_id,
         refunded=Money(refunded),
+        shift_id=shift_id,
     )
 
 
@@ -27,9 +28,9 @@ def test_persisted_store_round_trip(monkeypatch):
     db = install_fake_db(monkeypatch, store_module)
     store = store_module.SalesStore()
 
-    store.sales["sale-1"] = make_sale()
+    store.sales["sale-1"] = make_sale(shift_id="shift-1")
     store.sales["sale-2"] = make_sale("sale-2")
-    store.sales["sale-1"] = make_sale(refunded="5")
+    store.sales["sale-1"] = make_sale(refunded="5", shift_id="shift-1")
     store.refunds["r1"] = Refund("sale-1", Money("5"), RefundKind.STOCK_BACK, ["ph"], id="r1")
     store.refunds["r2"] = Refund("sale-2", Money("1"), RefundKind.MONEY_ONLY, id="r2")
     store.refunds["r1"] = Refund("sale-1", Money("5"), RefundKind.DEFECT_WRITE_OFF, ["ph"], id="r1")
@@ -40,6 +41,7 @@ def test_persisted_store_round_trip(monkeypatch):
     reloaded = store_module.SalesStore()
     sale = reloaded.get("sale-1")
     assert sale.refunded.amount == Decimal("5")
+    assert sale.shift_id == "shift-1"
     assert sale.payments[0].method == PaymentMethod.CARD
     assert sale.lines[0].quantity == Decimal("2")
     assert sale.total.amount == Decimal("20")

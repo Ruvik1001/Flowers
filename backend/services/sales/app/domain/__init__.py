@@ -44,6 +44,7 @@ class Sale:
     allocations: list[dict]
     id: str = field(default_factory=new_id)
     refunded: Money = field(default_factory=lambda: Money(0))
+    shift_id: str | None = None
 
     @property
     def total(self) -> Money:

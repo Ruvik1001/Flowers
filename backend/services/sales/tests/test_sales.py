@@ -25,10 +25,13 @@ def test_sale_payments_fifo_delegation_event_and_refunds():
     sale = service.complete(
         [{"product_id": "rose", "quantity": "2", "unit_price": "50"}],
         [{"method": "cash", "amount": "40"}, {"method": "card", "amount": "60"}],
+        shift_id="shift-1",
     )
     assert sale.total.amount == Decimal("100.00")
+    assert sale.shift_id == "shift-1"
     assert inventory.calls[0][0] == "consume"
     assert bus.drain("domain-events", "test") == 1 and events[0].payload["sale_id"] == sale.id
+    assert events[0].payload["shift_id"] == "shift-1"
     service.refund(sale.id, Decimal("20"), RefundKind.STOCK_BACK, "rose", Decimal("1"))
     service.refund(sale.id, Decimal("10"), RefundKind.MONEY_ONLY)
     service.refund(sale.id, Decimal("10"), RefundKind.DEFECT_WRITE_OFF, "rose", Decimal("1"), ["p"])
@@ -58,8 +61,19 @@ def test_http_inventory_adapter_and_api():
     adapter.write_off_defect("x", Decimal("1"), ["p"])
     assert len(calls) == 3
     store.sales.clear(); store.refunds.clear()
+    from app.domain import Payment, PaymentMethod, Sale, SaleLine
+    from shared.utils import Money
     from app.main import app
     api = TestClient(app, raise_server_exceptions=False)
     assert api.get("/health").status_code == 200
     assert api.get("/api/v1/sales").json() == []
+    seeded = Sale(
+        [SaleLine("rose", Decimal("1"), Money("10"))],
+        [Payment(PaymentMethod.CARD, Money("10"))],
+        [],
+        shift_id="shift-api",
+    )
+    store.sales[seeded.id] = seeded
+    listed = api.get("/api/v1/sales").json()
+    assert listed[0]["shift_id"] == "shift-api"
     assert api.post("/api/v1/sales/missing/refunds", json={"amount": 1, "kind": "money_only"}).status_code == 404

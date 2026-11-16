@@ -32,7 +32,7 @@ class AuthCubit extends SafeCubit<AuthState> {
         emit(const Unauthenticated());
       }
     } catch (e) {
-      emit(AuthFailure(e.toString()));
+      emit(AuthFailure(_friendlyError(e)));
       emit(const Unauthenticated());
     }
   }
@@ -48,8 +48,16 @@ class AuthCubit extends SafeCubit<AuthState> {
     } on AppFailure catch (e) {
       emit(AuthFailure(e.message));
     } catch (e) {
-      emit(AuthFailure(e.toString()));
+      emit(AuthFailure(_friendlyError(e)));
     }
+  }
+
+  String _friendlyError(Object e) {
+    final raw = e.toString();
+    if (raw.contains('Null check operator')) {
+      return 'Ошибка входа. Обновите страницу (Ctrl+F5) и попробуйте снова.';
+    }
+    return raw;
   }
 
   Future<void> logout() async {
@@ -70,7 +78,7 @@ class AuthCubit extends SafeCubit<AuthState> {
       emit(AuthFailure(e.message));
       emit(const Unauthenticated());
     } catch (e) {
-      emit(AuthFailure(e.toString()));
+      emit(AuthFailure(_friendlyError(e)));
       emit(const Unauthenticated());
     }
   }

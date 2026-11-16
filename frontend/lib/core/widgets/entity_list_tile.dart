@@ -43,7 +43,7 @@ class EntityListTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 DefaultTextStyle(
-                  style: theme.textTheme.titleMedium!.copyWith(
+                  style: (theme.textTheme.titleMedium ?? const TextStyle()).copyWith(
                     fontWeight: FontWeight.w800,
                     fontVariations: const [FontVariation('wght', 800)],
                     color: AppColors.ink,
@@ -54,7 +54,7 @@ class EntityListTile extends StatelessWidget {
                 if (subtitle != null) ...[
                   const SizedBox(height: 4),
                   DefaultTextStyle(
-                    style: theme.textTheme.bodyMedium!.copyWith(
+                    style: (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
                       color: AppColors.ink,
                       fontWeight: FontWeight.w600,
                       fontVariations: const [FontVariation('wght', 600)],

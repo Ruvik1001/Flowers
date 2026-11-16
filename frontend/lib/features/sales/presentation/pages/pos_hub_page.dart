@@ -500,7 +500,7 @@ class _PosHubViewState extends State<_PosHubView> {
                                     Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
-                            for (final s in byYear[year]!)
+                            for (final s in byYear[year] ?? const <Shift>[])
                               EntityListTile(
                                 onTap: () =>
                                     _openShiftDetail(s, salesState.sales),

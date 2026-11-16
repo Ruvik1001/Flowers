@@ -121,7 +121,9 @@ class ApiClient {
   }) async {
     try {
       final res = await dio.delete<dynamic>(path, data: data);
-      return parse != null ? parse(res.data) : res.data as T;
+      if (parse != null) return parse(res.data);
+      if (res.data == null) return null as T;
+      return res.data as T;
     } catch (e) {
       throw mapDioError(e);
     }

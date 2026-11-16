@@ -1,14 +1,14 @@
 # Procurement suppliers
 
-Short description: List and create suppliers.
+Short description: List, create, and archive suppliers.
 
-Persisted in Postgres (`procurement.suppliers`). No update/delete routes. Gateway-level errors (`401 missing_token|invalid_token|invalid_token_type`, `429`, `502`, `500`) apply – see `22_battlepersist_common_errors.md`.
+Persisted in Postgres (`procurement.suppliers`). Soft-archive via `/archive` (no hard delete). Gateway-level errors (`401 missing_token|invalid_token|invalid_token_type`, `429`, `502`, `500`) apply – see `22_battlepersist_common_errors.md`.
 
 ## 1. List suppliers
 
 ### Endpoint description
 
-Returns a plain JSON array of all suppliers.
+Returns a plain JSON array of suppliers. Archived suppliers are hidden unless `include_archived=true`.
 
 ### Endpoint name
 
@@ -23,7 +23,9 @@ Returns a plain JSON array of all suppliers.
 
 ### Accepted fields / params
 
-None.
+| Param | Type | Required | Description |
+|---|---|---|---|
+| `include_archived` | bool | no | Default `false` |
 
 ### Accepted body
 
@@ -41,7 +43,7 @@ Authorization: Bearer <access_token>
 
 ```json
 [
-  { "id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11", "name": "Garden LLC", "phone": "+7 900 000-00-00" }
+  { "id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11", "name": "Garden LLC", "phone": "+7 900 000-00-00", "archived": false }
 ]
 ```
 
@@ -92,7 +94,7 @@ Content-Type: application/json
 ### Response example (201)
 
 ```json
-{ "id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11", "name": "Garden LLC", "phone": "+7 900 000-00-00" }
+{ "id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11", "name": "Garden LLC", "phone": "+7 900 000-00-00", "archived": false }
 ```
 
 ### Error codes and messages
@@ -100,3 +102,33 @@ Content-Type: application/json
 | HTTP | code | message |
 |---|---|---|
 | 422 | – | Validation (`detail[]`), e.g. missing `name` |
+
+## 3. Archive supplier
+
+### Endpoint description
+
+Soft-archives a supplier (hidden from default list; cannot create new supplies). Responds `200`.
+
+### Endpoint name
+
+`POST /api/v1/procurement/suppliers/{supplier_id}/archive`
+
+### Response example (200)
+
+```json
+{ "id": "3a8f0c1e-6d55-4b0e-9f1a-2d6a7c9d0e11", "name": "Garden LLC", "phone": "+7 900 000-00-00", "archived": true }
+```
+
+### Error codes and messages
+
+| HTTP | code | message |
+|---|---|---|
+| 404 | `supplier_not_found` | Supplier not found |
+
+## 4. Unarchive supplier
+
+### Endpoint name
+
+`POST /api/v1/procurement/suppliers/{supplier_id}/unarchive`
+
+Same response shape as create, with `archived: false`.

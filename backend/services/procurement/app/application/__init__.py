@@ -39,11 +39,26 @@ class ProcurementService:
             self.store.suppliers[supplier.id] = supplier
         return supplier
 
-    def create_supply(self, supplier_id: str, lines: list[dict]) -> Supply:
-        if supplier_id not in self.store.suppliers:
-            from shared.errors import AppError
+    def archive_supplier(self, supplier_id: str) -> Supplier:
+        supplier = self.store.supplier(supplier_id)
+        supplier.archived = True
+        with unit_of_work():
+            self.store.suppliers[supplier.id] = supplier
+        return supplier
 
-            raise AppError("supplier_not_found", "Supplier not found", status_code=404)
+    def unarchive_supplier(self, supplier_id: str) -> Supplier:
+        supplier = self.store.supplier(supplier_id)
+        supplier.archived = False
+        with unit_of_work():
+            self.store.suppliers[supplier.id] = supplier
+        return supplier
+
+    def create_supply(self, supplier_id: str, lines: list[dict]) -> Supply:
+        from shared.errors import AppError
+
+        supplier = self.store.supplier(supplier_id)
+        if supplier.archived:
+            raise AppError("supplier_archived", "Supplier is archived", status_code=409)
         supply = Supply(
             supplier_id,
             [SupplyLine(x["product_id"], Decimal(str(x["quantity"])), Money(x["unit_cost"])) for x in lines],

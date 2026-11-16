@@ -100,6 +100,16 @@ class SupplyRow(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(_json_type(), nullable=False, default=dict)
 
 
+class FolderRow(Base):
+    __tablename__ = "folders"
+    __table_args__ = {"schema": "inventory"}
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
 class LotRow(Base):
     __tablename__ = "lots"
     __table_args__ = {"schema": "inventory"}
@@ -110,6 +120,8 @@ class LotRow(Base):
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    folder_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class WriteOffRow(Base):

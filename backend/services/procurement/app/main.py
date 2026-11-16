@@ -48,7 +48,12 @@ def health():
 
 
 def _supplier_dict(supplier):
-    return {"id": supplier.id, "name": supplier.name, "phone": supplier.phone}
+    return {
+        "id": supplier.id,
+        "name": supplier.name,
+        "phone": supplier.phone,
+        "archived": supplier.archived,
+    }
 
 
 def _supply_dict(supply):
@@ -70,13 +75,27 @@ def _supply_dict(supply):
 
 
 @app.get("/api/v1/suppliers")
-def suppliers():
-    return [_supplier_dict(x) for x in store.suppliers.values()]
+def suppliers(include_archived: bool = False):
+    return [
+        _supplier_dict(x)
+        for x in store.suppliers.values()
+        if include_archived or not x.archived
+    ]
 
 
 @app.post("/api/v1/suppliers", status_code=201)
 def create_supplier(body: SupplierIn):
     return _supplier_dict(service.create_supplier(**body.model_dump()))
+
+
+@app.post("/api/v1/suppliers/{supplier_id}/archive")
+def archive_supplier(supplier_id: str):
+    return _supplier_dict(service.archive_supplier(supplier_id))
+
+
+@app.post("/api/v1/suppliers/{supplier_id}/unarchive")
+def unarchive_supplier(supplier_id: str):
+    return _supplier_dict(service.unarchive_supplier(supplier_id))
 
 
 @app.get("/api/v1/supplies")

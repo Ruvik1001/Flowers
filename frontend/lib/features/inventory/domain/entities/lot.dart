@@ -9,6 +9,8 @@ class Lot extends Equatable {
     required this.unitCost,
     this.receivedAt,
     this.expiresOn,
+    this.folderId,
+    this.sortOrder = 0,
   });
 
   final String id;
@@ -17,6 +19,8 @@ class Lot extends Equatable {
   final double unitCost;
   final String? receivedAt;
   final String? expiresOn;
+  final String? folderId;
+  final int sortOrder;
 
   factory Lot.fromJson(Map<String, dynamic> json) {
     return Lot(
@@ -26,10 +30,14 @@ class Lot extends Equatable {
       unitCost: parseMoney(json['unit_cost']),
       receivedAt: json['received_at']?.toString(),
       expiresOn: json['expires_on']?.toString(),
+      folderId: json['folder_id']?.toString(),
+      sortOrder: json['sort_order'] is int
+          ? json['sort_order'] as int
+          : int.tryParse('${json['sort_order'] ?? 0}') ?? 0,
     );
   }
 
   @override
   List<Object?> get props =>
-      [id, productId, quantity, unitCost, receivedAt, expiresOn];
+      [id, productId, quantity, unitCost, receivedAt, expiresOn, folderId, sortOrder];
 }

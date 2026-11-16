@@ -5,12 +5,12 @@ from decimal import Decimal
 from sqlalchemy import delete, select
 
 from shared.errors import AppError
-from shared.persistence.models import CountRow, LotRow, WriteOffRow
+from shared.persistence.models import CountRow, FolderRow, LotRow, WriteOffRow
 from shared.persistence.persist_map import PersistMap
 from shared.persistence.runtime import db_session, persistence_enabled
 from shared.utils import Money
 
-from app.domain import Allocation, InventoryCount, Lot, WriteOff, consume_fifo
+from app.domain import Allocation, Folder, InventoryCount, Lot, WriteOff, consume_fifo
 
 
 def _lot_from_row(row: LotRow) -> Lot:
@@ -26,6 +26,17 @@ def _lot_from_row(row: LotRow) -> Lot:
         unit_cost=Money(row.unit_cost),
         received_at=received,
         expires_on=row.expires_on,
+        folder_id=row.folder_id,
+        sort_order=int(row.sort_order or 0),
+    )
+
+
+def _folder_from_row(row: FolderRow) -> Folder:
+    return Folder(
+        id=row.id,
+        name=row.name,
+        sort_order=int(row.sort_order or 0),
+        archived=bool(row.archived),
     )
 
 
@@ -83,6 +94,11 @@ def _count_payload(item: InventoryCount) -> dict:
 class InventoryStore:
     def __init__(self) -> None:
         self._persist = persistence_enabled()
+        self.folders: PersistMap[str, Folder] = PersistMap(
+            on_set=self._save_folder if self._persist else None,
+            on_del=self._delete_folder if self._persist else None,
+            on_clear=self._clear_folders if self._persist else None,
+        )
         self.lots: PersistMap[str, Lot] = PersistMap(
             on_set=self._save_lot if self._persist else None,
             on_del=self._delete_lot if self._persist else None,
@@ -103,14 +119,34 @@ class InventoryStore:
 
     def _load(self) -> None:
         with db_session() as session:
+            folders = [_folder_from_row(r) for r in session.scalars(select(FolderRow)).all()]
             lots = [_lot_from_row(r) for r in session.scalars(select(LotRow)).all()]
             write_offs = [
                 _write_off_from_payload(r.payload) for r in session.scalars(select(WriteOffRow)).all()
             ]
             counts = [_count_from_payload(r.payload) for r in session.scalars(select(CountRow)).all()]
+        self.folders.replace_all((folder.id, folder) for folder in folders)
         self.lots.replace_all((lot.id, lot) for lot in lots)
         self.write_offs.replace_all((item.id, item) for item in write_offs)
         self.counts.replace_all((item.id, item) for item in counts)
+
+    def _save_folder(self, folder_id: str, folder: Folder) -> None:
+        with db_session() as session:
+            row = session.get(FolderRow, folder_id) or FolderRow(id=folder_id)
+            row.name = folder.name
+            row.sort_order = folder.sort_order
+            row.archived = folder.archived
+            session.merge(row)
+
+    def _delete_folder(self, folder_id: str) -> None:
+        with db_session() as session:
+            row = session.get(FolderRow, folder_id)
+            if row:
+                session.delete(row)
+
+    def _clear_folders(self) -> None:
+        with db_session() as session:
+            session.execute(delete(FolderRow))
 
     def _save_lot(self, lot_id: str, lot: Lot) -> None:
         with db_session() as session:
@@ -120,6 +156,8 @@ class InventoryStore:
             row.unit_cost = lot.unit_cost.amount
             row.received_at = lot.received_at
             row.expires_on = lot.expires_on
+            row.folder_id = lot.folder_id
+            row.sort_order = lot.sort_order
             session.merge(row)
 
     def _delete_lot(self, lot_id: str) -> None:
@@ -163,6 +201,12 @@ class InventoryStore:
     def _clear_counts(self) -> None:
         with db_session() as session:
             session.execute(delete(CountRow))
+
+    def get_folder(self, folder_id: str) -> Folder:
+        try:
+            return self.folders[folder_id]
+        except KeyError as exc:
+            raise AppError("folder_not_found", "Folder not found", status_code=404) from exc
 
     def get_lot(self, lot_id: str) -> Lot:
         try:

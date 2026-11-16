@@ -65,17 +65,29 @@ CREATE TABLE IF NOT EXISTS procurement.supplies (
 );
 
 -- inventory
+CREATE TABLE IF NOT EXISTS inventory.folders (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    archived BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 CREATE TABLE IF NOT EXISTS inventory.lots (
     id TEXT PRIMARY KEY,
     product_id TEXT NOT NULL,
     quantity NUMERIC(14,3) NOT NULL,
     unit_cost NUMERIC(12,2) NOT NULL,
     received_at TIMESTAMPTZ NOT NULL,
-    expires_on DATE NULL
+    expires_on DATE NULL,
+    folder_id TEXT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS ix_lots_product_id
     ON inventory.lots (product_id);
+
+CREATE INDEX IF NOT EXISTS ix_lots_folder_id
+    ON inventory.lots (folder_id);
 
 CREATE TABLE IF NOT EXISTS inventory.write_offs (
     id TEXT PRIMARY KEY,

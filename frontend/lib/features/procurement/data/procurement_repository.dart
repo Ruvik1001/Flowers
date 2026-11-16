@@ -30,6 +30,20 @@ class ProcurementRepository {
     );
   }
 
+  Future<Supplier> archiveSupplier(String id) {
+    return _api.post<Supplier>(
+      '/procurement/suppliers/$id/archive',
+      parse: (data) => Supplier.fromJson(asJsonMap(data)),
+    );
+  }
+
+  Future<Supplier> unarchiveSupplier(String id) {
+    return _api.post<Supplier>(
+      '/procurement/suppliers/$id/unarchive',
+      parse: (data) => Supplier.fromJson(asJsonMap(data)),
+    );
+  }
+
   Future<List<Supply>> listSupplies() {
     return _api.get<List<Supply>>(
       '/procurement/supplies',

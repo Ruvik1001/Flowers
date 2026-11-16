@@ -80,6 +80,17 @@ class _PosHubViewState extends State<_PosHubView> {
     }).join(', ');
   }
 
+  String _formatShiftDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '—';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    final local = parsed.toLocal();
+    final dd = local.day.toString().padLeft(2, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    final yyyy = local.year.toString();
+    return '$dd.$mm.$yyyy';
+  }
+
   Future<void> _openSale(Shift? openShift) async {
     if (openShift == null) {
       AppMessage.showError(context, 'Сначала откройте смену');
@@ -449,7 +460,8 @@ class _PosHubViewState extends State<_PosHubView> {
                       for (final s in closed)
                         EntityListTile(
                           title: Text(
-                            'Закрыта · Δ ${formatRub(s.discrepancy ?? 0)}',
+                            '${_formatShiftDate(s.closedAt)} · Закрыта'
+                            ' · Δ ${formatRub(s.discrepancy ?? 0)}',
                           ),
                           subtitle: Text(
                             'Ожид. ${formatRub(s.expectedCash ?? s.inDrawer)}'

@@ -12,11 +12,13 @@ class InventoryCubit extends SafeCubit<InventoryState> {
     emit(state.copyWith(loading: true, clearError: true));
     try {
       final lots = await _repository.listLots();
+      final folders = await _repository.listFolders();
       final expired = await _repository.listExpired();
       emit(
         state.copyWith(
           loading: false,
           lots: lots,
+          folders: folders,
           expired: expired,
           clearError: true,
         ),
@@ -41,6 +43,79 @@ class InventoryCubit extends SafeCubit<InventoryState> {
         unitCost: unitCost,
         expiresOn: expiresOn,
       );
+      await load();
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
+  Future<void> updateLot({
+    required String id,
+    double? quantity,
+    double? unitCost,
+    String? expiresOn,
+    bool clearExpiresOn = false,
+    String? folderId,
+    bool clearFolder = false,
+    int? sortOrder,
+  }) async {
+    try {
+      await _repository.updateLot(
+        id: id,
+        quantity: quantity,
+        unitCost: unitCost,
+        expiresOn: expiresOn,
+        clearExpiresOn: clearExpiresOn,
+        folderId: folderId,
+        clearFolder: clearFolder,
+        sortOrder: sortOrder,
+      );
+      await load();
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
+  Future<void> deleteLot(String id) async {
+    try {
+      await _repository.deleteLot(id);
+      await load();
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
+  Future<void> createFolder({required String name}) async {
+    try {
+      final maxOrder = state.folders.isEmpty
+          ? 0
+          : state.folders.map((f) => f.sortOrder).reduce((a, b) => a > b ? a : b);
+      await _repository.createFolder(name: name, sortOrder: maxOrder + 1);
+      await load();
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
+  Future<void> archiveFolder(String id) async {
+    try {
+      await _repository.archiveFolder(id);
+      await load();
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
+  Future<void> reorderLots(List<String> orderedIds) async {
+    try {
+      for (var i = 0; i < orderedIds.length; i++) {
+        await _repository.updateLot(id: orderedIds[i], sortOrder: i);
+      }
       await load();
     } on AppFailure catch (e) {
       emit(state.copyWith(error: e.message));

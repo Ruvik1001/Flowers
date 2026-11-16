@@ -36,3 +36,5 @@ def test_enforce_rejects_missing_and_denied() -> None:
 def test_inventory_write_off_prefers_specific_rule() -> None:
     assert required_permissions("inventory", "POST", "write-offs") == ["inventory.write_off"]
     assert "inventory.write" in required_permissions("inventory", "POST", "lots")
+    assert "inventory.write" in required_permissions("inventory", "PATCH", "lots/x")
+    assert required_permissions("inventory", "DELETE", "lots/x") == ["inventory.write"]

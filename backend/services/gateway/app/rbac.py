@@ -30,6 +30,8 @@ _RULES: list[tuple[str, str, str, list[str]]] = [
     ("inventory", "GET", "", ["inventory.read"]),
     ("inventory", "POST", "write-offs", ["inventory.write_off"]),
     ("inventory", "POST", "", ["inventory.write", "inventory.write_off"]),
+    ("inventory", "PATCH", "", ["inventory.write", "inventory.write_off"]),
+    ("inventory", "DELETE", "", ["inventory.write"]),
     ("assembly", "GET", "", ["assembly.read", "assembly.write"]),
     ("assembly", "POST", "", ["assembly.write"]),
     ("sales", "GET", "", ["sales.read"]),

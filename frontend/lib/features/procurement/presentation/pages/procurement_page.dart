@@ -162,6 +162,39 @@ class _SuppliersTab extends StatelessWidget {
   final List<Supplier> suppliers;
   final VoidCallback onAdd;
 
+  Future<void> _confirmDelete(BuildContext context, Supplier supplier) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить поставщика?'),
+        content: Text(
+          '«${supplier.name}» исчезнет из списка. Историю поставок это не затронет.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await context.read<ProcurementCubit>().archiveSupplier(supplier.id);
+      if (context.mounted) {
+        AppMessage.showSuccess(context, 'Поставщик удалён');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        AppMessage.showError(context, 'Не удалось удалить поставщика');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -193,6 +226,19 @@ class _SuppliersTab extends StatelessWidget {
                     return EntityListTile(
                       title: Text(s.name),
                       subtitle: Text(phone),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            _confirmDelete(context, s);
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Удалить'),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),

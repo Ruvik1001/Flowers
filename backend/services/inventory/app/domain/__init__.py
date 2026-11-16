@@ -9,12 +9,22 @@ from shared.utils import Money, new_id
 
 
 @dataclass(slots=True)
+class Folder:
+    name: str
+    sort_order: int = 0
+    archived: bool = False
+    id: str = field(default_factory=new_id)
+
+
+@dataclass(slots=True)
 class Lot:
     product_id: str
     quantity: Decimal
     unit_cost: Money
     received_at: datetime
     expires_on: date | None = None
+    folder_id: str | None = None
+    sort_order: int = 0
     id: str = field(default_factory=new_id)
 
 
@@ -77,4 +87,3 @@ class InventoryCount:
 def expired(lots: list[Lot], on: date | None = None) -> list[Lot]:
     target = on or datetime.now(UTC).date()
     return [lot for lot in lots if lot.expires_on and lot.expires_on <= target and lot.quantity > 0]
-

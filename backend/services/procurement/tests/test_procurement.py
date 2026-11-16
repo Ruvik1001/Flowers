@@ -53,3 +53,21 @@ def test_http_adapter_and_api():
     assert len(listed) == 1
     assert listed[0]["created_at"] == body["created_at"]
     assert listed[0]["lines"][0]["product_id"] == "x"
+
+    archived = client.post(f"/api/v1/suppliers/{supplier['id']}/archive")
+    assert archived.status_code == 200
+    assert archived.json()["archived"] is True
+    assert client.get("/api/v1/suppliers").json() == []
+    assert len(client.get("/api/v1/suppliers?include_archived=true").json()) == 1
+    blocked = client.post(
+        "/api/v1/supplies",
+        json={
+            "supplier_id": supplier["id"],
+            "lines": [{"product_id": "y", "quantity": 1, "unit_cost": 1}],
+        },
+    )
+    assert blocked.status_code == 409
+    restored = client.post(f"/api/v1/suppliers/{supplier['id']}/unarchive")
+    assert restored.status_code == 200
+    assert restored.json()["archived"] is False
+    assert len(client.get("/api/v1/suppliers").json()) == 1

@@ -54,6 +54,16 @@ class ProcurementCubit extends SafeCubit<ProcurementState> {
     }
   }
 
+  Future<void> archiveSupplier(String id) async {
+    try {
+      await _repository.archiveSupplier(id);
+      await load();
+    } on AppFailure catch (e) {
+      emit(state.copyWith(error: e.message));
+      rethrow;
+    }
+  }
+
   Future<void> createSupply({
     required String supplierId,
     required List<SupplyLine> lines,

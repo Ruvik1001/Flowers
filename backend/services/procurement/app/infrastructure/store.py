@@ -127,6 +127,11 @@ class ProcurementStore:
         with db_session() as session:
             session.execute(delete(SupplyRow))
 
+    def supplier(self, supplier_id: str) -> Supplier:
+        if supplier_id not in self.suppliers:
+            raise AppError("supplier_not_found", "Supplier not found", status_code=404)
+        return self.suppliers[supplier_id]
+
     def supply(self, supply_id: str) -> Supply:
         if supply_id not in self.supplies:
             raise AppError("supply_not_found", "Supply not found", status_code=404)

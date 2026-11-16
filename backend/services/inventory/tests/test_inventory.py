@@ -27,12 +27,13 @@ def test_fifo_rejects_invalid_and_insufficient_without_mutation():
 
 
 def test_inventory_api_end_to_end():
-    store.lots.clear(); store.write_offs.clear(); store.counts.clear()
+    store.lots.clear(); store.write_offs.clear(); store.counts.clear(); store.folders.clear()
     from app.main import app
     client = TestClient(app, raise_server_exceptions=False)
     assert client.get("/health").json()["status"] == "ok"
     first = client.post("/api/v1/lots", json={"product_id": "rose", "quantity": "5", "unit_cost": "12.345", "expires_on": str(date.today())})
     assert first.status_code == 201
+    lot_id = first.json()["id"]
     assert client.get("/api/v1/inventory/expired").json()
     consumed = client.post("/api/v1/inventory/consume", json={"product_id": "rose", "quantity": "1"})
     assert consumed.status_code == 200
@@ -44,3 +45,23 @@ def test_inventory_api_end_to_end():
     assert len(client.get("/api/v1/lots").json()) == 1
     missing = client.post("/api/v1/inventory/consume", json={"product_id": "x", "quantity": "1"})
     assert missing.status_code == 409
+
+    folder = client.post("/api/v1/folders", json={"name": "Розы", "sort_order": 1})
+    assert folder.status_code == 201
+    folder_id = folder.json()["id"]
+    patched = client.patch(
+        f"/api/v1/lots/{lot_id}",
+        json={"quantity": "10", "unit_cost": "50", "folder_id": folder_id, "sort_order": 2},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["quantity"] == "10"
+    assert patched.json()["folder_id"] == folder_id
+    assert patched.json()["sort_order"] == 2
+    assert len(client.get("/api/v1/folders").json()) == 1
+    deleted = client.delete(f"/api/v1/lots/{lot_id}")
+    assert deleted.status_code == 204
+    assert client.get("/api/v1/lots").json() == []
+    archived = client.post(f"/api/v1/folders/{folder_id}/archive")
+    assert archived.status_code == 200
+    assert archived.json()["archived"] is True
+    assert client.get("/api/v1/folders").json() == []
